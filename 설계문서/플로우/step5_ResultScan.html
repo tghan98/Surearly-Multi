@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>⑤ 최종 측정·판독 - Surearly Multi</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card-bg:#ffffff; --card-border:#d7dee6;
+    --text:#1c2530; --sub:#5b6b7a;
+    --accent:#2f6fed; --accent-bg:#eaf1ff;
+    --error:#d3402f; --error-bg:#fdecea;
+    --idle:#6a4bd6; --idle-bg:#efe9fb;
+    --success:#1f9d55; --success-bg:#e7f8ee;
+    --teal:#0f8a8a; --arrow:#9aa7b4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12161c; --card-bg:#1b212a; --card-border:#2c3543;
+      --text:#e7ecf2; --sub:#9fb0c0;
+      --accent:#6fa3ff; --accent-bg:#1c2c4a;
+      --error:#ff6b5a; --error-bg:#3a1f1c;
+      --idle:#b79bff; --idle-bg:#2a2140;
+      --success:#4ddb8c; --success-bg:#123a26;
+      --teal:#4fd6d6; --arrow:#586576;
+    }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text);
+    font-family:"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif; line-height:1.55; }
+  .wrap{ max-width:980px; margin:0 auto; padding:24px 20px 80px; }
+
+  .nav{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  .nav a{ color:var(--accent); text-decoration:none; font-size:0.88rem; font-weight:600;
+    background:var(--accent-bg); padding:6px 12px; border-radius:999px; white-space:nowrap; }
+  .nav a:hover{ text-decoration:underline; }
+
+  header{ text-align:center; margin-bottom:20px; }
+  header h1{ font-size:1.4rem; margin:0 0 6px; }
+  header p{ color:var(--sub); margin:0; font-size:0.92rem; }
+
+  .legend{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px 18px; margin:0 0 24px;
+    padding:12px 16px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px;
+    font-size:0.83rem; color:var(--sub); }
+  .legend span{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .dot{ width:12px; height:12px; border-radius:50%; display:inline-block; flex:none; }
+  .line-sample{ width:22px; height:0; border-top:3px solid; display:inline-block; }
+  .line-dashed{ border-top-style:dashed; }
+
+  .diagram-scroll{ overflow-x:auto; background:var(--card-bg); border:1px solid var(--card-border);
+    border-radius:16px; padding:16px; margin-bottom:30px; }
+  .diagram-scroll svg{ display:block; margin:0 auto; }
+  .node-title{ font-size:15px; font-weight:700; fill:var(--text); }
+  .node-time{ font-size:11.5px; fill:var(--sub); }
+  .edge-label{ font-size:11.5px; fill:var(--sub); }
+  .edge-label-strong{ font-size:11.5px; fill:var(--error); font-weight:600; }
+  .edge-label-green{ font-size:11.5px; fill:var(--success); font-weight:600; }
+  .edge-label-accent{ font-size:11.5px; fill:var(--accent); font-weight:600; }
+
+  h2.section-title{ font-size:1.05rem; margin:30px 0 14px; }
+  .flow{ display:flex; flex-direction:column; gap:12px; }
+  .step{ background:var(--card-bg); border:1px solid var(--card-border); border-left:6px solid var(--accent);
+    border-radius:14px; padding:13px 18px; }
+  .step.success{ border-left-color:var(--success); }
+  .step-head{ display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .num{ flex:none; width:24px; height:24px; border-radius:50%; background:var(--accent-bg); color:var(--accent);
+    font-weight:700; font-size:0.76rem; display:flex; align-items:center; justify-content:center; }
+  .step.success .num{ background:var(--success-bg); color:var(--success); }
+  .title{ font-weight:700; font-size:0.97rem; }
+  .desc{ color:var(--sub); font-size:0.88rem; margin:6px 0 0; }
+  .fail-tag{ margin-top:7px; display:inline-flex; align-items:center; gap:6px; background:var(--error-bg); color:var(--error);
+    border:1px dashed var(--error); border-radius:8px; padding:4px 9px; font-size:0.76rem; margin-right:6px; }
+  .note-tag{ margin-top:7px; display:inline-flex; align-items:center; gap:6px; background:var(--accent-bg); color:var(--accent);
+    border:1px dashed var(--accent); border-radius:8px; padding:4px 9px; font-size:0.76rem; }
+
+  .error-box{ margin:14px 0 10px; background:var(--error-bg); border:1px solid var(--error); border-radius:14px; padding:14px 18px; }
+  .error-box .num{ background:var(--error); color:#fff; }
+  .error-box .title{ color:var(--error); }
+  .error-box .desc{ color:var(--text); opacity:0.85; }
+
+  footer{ text-align:center; color:var(--sub); font-size:0.76rem; margin-top:32px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="nav">
+    <a href="step4_SampleCheckReaction.html">◀ 이전: ④ 샘플량 확인·반응 대기</a>
+    <a href="systemFlowChart.html">🏠 전체 흐름도로</a>
+  </div>
+
+  <header>
+    <h1>⑤ 최종 측정 · 판독 — 세부 흐름도</h1>
+    <p>반응이 끝난 스틱을 최종 측정해서 양성/음성을 판정하는 단계입니다.</p>
+  </header>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--accent)"></span>정상 진행 단계</span>
+    <span><span class="dot" style="background:var(--success)"></span>완료(다음 단계로)</span>
+    <span><span class="dot" style="background:var(--error)"></span>오류 처리</span>
+    <span><span class="line-sample" style="border-color:var(--success)"></span>양성(YES) 판정</span>
+    <span><span class="line-sample" style="border-color:var(--accent)"></span>음성(NO) 판정</span>
+    <span><span class="line-sample line-dashed" style="border-color:var(--error)"></span>오류 발생 경로</span>
+  </div>
+
+  <div class="diagram-scroll">
+    <svg width="900" height="1080" viewBox="0 0 900 1080" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="ahBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+        </marker>
+        <marker id="ahGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--success)"/>
+        </marker>
+        <marker id="ahRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--error)"/>
+        </marker>
+      </defs>
+
+      <!-- main flow -->
+      <path d="M230,90 L230,120" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <path d="M230,210 L230,240" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <path d="M230,330 L230,360" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <path d="M230,450 L230,480" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <path d="M230,560 L230,590" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+
+      <path d="M230,690 L230,720" stroke="var(--success)" stroke-width="3" fill="none" marker-end="url(#ahGreen)"/>
+      <text class="edge-label-green" x="240" y="710">기준치 이상 (정상)</text>
+
+      <!-- YES/NO split -->
+      <path d="M180,820 L180,850" stroke="var(--success)" stroke-width="3" fill="none" marker-end="url(#ahGreen)"/>
+      <text class="edge-label-green" x="150" y="840" text-anchor="end">초과 → 양성(YES)</text>
+
+      <path d="M280,820 L280,850" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <text class="edge-label-accent" x="290" y="840" text-anchor="start">이하 → 음성(NO)</text>
+
+      <path d="M230,930 L230,960" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+
+      <!-- error branch -->
+      <path d="M400,640 L600,640" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="410" y="630">기준치 미만 → 대조선 이상</text>
+
+      <!-- nodes -->
+      <g>
+        <rect x="60" y="20" width="340" height="70" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="52" text-anchor="middle">🔔 진입: 반응 시간 종료 직후</text>
+        <text class="node-time" x="230" y="72" text-anchor="middle">총 3분 반응 대기가 끝난 시점</text>
+      </g>
+
+      <g>
+        <rect x="60" y="120" width="340" height="90" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="153" text-anchor="middle">📡 최종 밝기 측정</text>
+        <text class="node-time" x="230" y="175" text-anchor="middle">대조선 → 보조대조선 → 보조시험선 → 시험선</text>
+        <text class="node-time" x="230" y="191" text-anchor="middle">순서로 4개 채널을 모두 측정</text>
+      </g>
+
+      <g>
+        <rect x="60" y="240" width="340" height="90" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="273" text-anchor="middle">🧮 빈 스틱 대비 정규화</text>
+        <text class="node-time" x="230" y="295" text-anchor="middle">처음 측정해둔 "빈 스틱 기준값"과 비교해</text>
+        <text class="node-time" x="230" y="311" text-anchor="middle">개체차를 보정한 값으로 환산</text>
+      </g>
+
+      <g>
+        <rect x="60" y="360" width="340" height="90" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="393" text-anchor="middle">🧮 시험선·대조선 판정 비율 계산</text>
+        <text class="node-time" x="230" y="415" text-anchor="middle">최종 시험선(T)·대조선(C) 판정 비율 산출</text>
+      </g>
+
+      <g>
+        <rect x="60" y="480" width="340" height="80" rx="14" fill="var(--success-bg)" stroke="var(--success)" stroke-width="2"/>
+        <text class="node-title" x="230" y="513" text-anchor="middle">💾 판정 비율 값 우선 저장</text>
+        <text class="node-time" x="230" y="535" text-anchor="middle">아래에서 오류로 끝나도 이번 측정값이 남도록 먼저 기록</text>
+      </g>
+
+      <g>
+        <rect x="60" y="590" width="340" height="100" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="623" text-anchor="middle">대조선(C) 비율이 기준치 미만인가?</text>
+        <text class="node-time" x="230" y="645" text-anchor="middle">대조선은 "검사가 제대로 됐는지"를 보여주는 기준선</text>
+        <text class="node-time" x="230" y="661" text-anchor="middle">→ 기준 미달이면 검사 자체가 무효</text>
+      </g>
+
+      <g>
+        <rect x="60" y="720" width="340" height="100" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="753" text-anchor="middle">시험선(T) 비율이 기준치 초과인가?</text>
+        <text class="node-time" x="230" y="775" text-anchor="middle">시험선은 실제 검사 결과를 보여주는 선</text>
+        <text class="node-time" x="230" y="791" text-anchor="middle">→ 기준 초과 여부로 양성/음성을 가림</text>
+      </g>
+
+      <g>
+        <rect x="60" y="850" width="340" height="80" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="883" text-anchor="middle">💾 판정 결과(양성/음성) 저장</text>
+        <text class="node-time" x="230" y="905" text-anchor="middle">화면에 표시할 최종 결과값 확정</text>
+      </g>
+
+      <g>
+        <rect x="60" y="960" width="340" height="80" rx="14" fill="var(--success-bg)" stroke="var(--success)" stroke-width="2"/>
+        <text class="node-title" x="230" y="995" text-anchor="middle">✅ 완료</text>
+        <text class="node-time" x="230" y="1017" text-anchor="middle">⑥ 결과 표시 단계로 이동</text>
+      </g>
+
+      <!-- error box -->
+      <g>
+        <rect x="600" y="590" width="260" height="100" rx="16" fill="var(--error-bg)" stroke="var(--error)" stroke-width="2"/>
+        <text class="node-title" x="730" y="623" text-anchor="middle" fill="var(--error)">🚫 오류 처리</text>
+        <text class="node-time" x="730" y="645" text-anchor="middle">대조선 이상(검사 무효) 기록 →</text>
+        <text class="node-time" x="730" y="661" text-anchor="middle">2분 표시 → 대기 모드로 복귀</text>
+      </g>
+    </svg>
+  </div>
+
+  <h2 class="section-title">🔎 단계별 자세히 보기</h2>
+
+  <div class="flow">
+    <div class="step">
+      <div class="step-head"><div class="num">1</div><div class="title">📡 최종 밝기 측정 &amp; 정규화</div></div>
+      <p class="desc">대조선·보조대조선·보조시험선·시험선 4개 채널을 순서대로 측정하고, 처음에 재둔 빈 스틱 기준값과 비교해 개체차를 보정한 판정 비율을 계산합니다.</p>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="num">2</div><div class="title">💾 판정 비율 값 우선 저장</div></div>
+      <p class="desc">아래 대조선 판정에서 오류로 끝나더라도, 이번에 실제로 측정한 시험선·대조선 비율 값이 기기 내부에 남도록 판정보다 먼저 저장합니다.</p>
+      <div class="note-tag">ℹ 예전에는 저장 순서가 뒤에 있어, 대조선 오류 시 이전 테스트 값이 잘못 남는 문제가 있었음(수정됨)</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="num">3</div><div class="title">대조선(C) 판정 — 검사 유효성 확인</div></div>
+      <p class="desc">대조선은 "이 검사가 정상적으로 이뤄졌는지"를 보여주는 기준선입니다. 대조선 비율이 기준치에 못 미치면 검사 자체가 무효로 처리됩니다.</p>
+      <div class="fail-tag">⚠ 대조선 비율이 기준치 미만 → 오류 처리(검사 무효)</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="num">4</div><div class="title">시험선(T) 판정 — 양성/음성 결정</div></div>
+      <p class="desc">대조선이 정상이면, 시험선 비율이 기준치를 넘는지에 따라 양성(YES)/음성(NO)을 최종 결정하고 저장합니다.</p>
+    </div>
+
+    <div class="step success">
+      <div class="step-head"><div class="num">✓</div><div class="title">완료</div></div>
+      <p class="desc">판정이 끝나면 ⑥ 결과 표시 단계로 넘어가 화면에 결과를 보여줍니다.</p>
+    </div>
+  </div>
+
+  <div class="error-box">
+    <div class="step-head"><div class="num">!</div><div class="title">🚫 이 단계에서 발생 가능한 오류</div></div>
+    <p class="desc">대조선 이상(검사 무효) 한 가지가 이 단계의 오류입니다. 원인 기록 → 오류 메시지 약 2분 표시 → 대기 모드로 복귀. (공통 절차의 자세한 설명은 전체 흐름도 문서 참고)</p>
+  </div>
+
+  <footer>
+    Surearly Multi / MFx_New_Ver — ⑤ 최종 측정·판독 세부 흐름도. 관련 함수: <code>DM_App_Main_Sq_Result_Scan_Step_Handler()</code>.
+  </footer>
+
+</div>
+</body>
+</html>

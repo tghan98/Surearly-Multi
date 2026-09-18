@@ -1,0 +1,18 @@
+{
+  "workspace": {
+    "path": "${workspaceFolder}\\OVULATION_MULTI_New.eww"
+  },
+  "workspaces": {
+    "${workspaceFolder}\\OVULATION_MULTI_New.eww": {
+      "configs": {
+        "${workspaceFolder}\\OVULATION_MULTI_New.ewp": "Debug"
+      },
+      "selected": {
+        "path": "${workspaceFolder}\\OVULATION_MULTI_New.ewp"
+      }
+    }
+  },
+  "workbench": {
+    "path": "C:\\Program Files (x86)\\IAR Systems\\Embedded Workbench 8.3"
+  }
+}

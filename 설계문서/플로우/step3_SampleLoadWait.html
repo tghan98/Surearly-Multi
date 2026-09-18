@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>③ 샘플 투입 대기 - Surearly Multi</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card-bg:#ffffff; --card-border:#d7dee6;
+    --text:#1c2530; --sub:#5b6b7a;
+    --accent:#2f6fed; --accent-bg:#eaf1ff;
+    --error:#d3402f; --error-bg:#fdecea;
+    --idle:#6a4bd6; --idle-bg:#efe9fb;
+    --success:#1f9d55; --success-bg:#e7f8ee;
+    --teal:#0f8a8a; --teal-bg:#e2f3f3; --arrow:#9aa7b4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12161c; --card-bg:#1b212a; --card-border:#2c3543;
+      --text:#e7ecf2; --sub:#9fb0c0;
+      --accent:#6fa3ff; --accent-bg:#1c2c4a;
+      --error:#ff6b5a; --error-bg:#3a1f1c;
+      --idle:#b79bff; --idle-bg:#2a2140;
+      --success:#4ddb8c; --success-bg:#123a26;
+      --teal:#4fd6d6; --teal-bg:#123232; --arrow:#586576;
+    }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text);
+    font-family:"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif; line-height:1.55; }
+  .wrap{ max-width:980px; margin:0 auto; padding:24px 20px 80px; }
+
+  .nav{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  .nav a{ color:var(--accent); text-decoration:none; font-size:0.88rem; font-weight:600;
+    background:var(--accent-bg); padding:6px 12px; border-radius:999px; white-space:nowrap; }
+  .nav a:hover{ text-decoration:underline; }
+
+  header{ text-align:center; margin-bottom:20px; }
+  header h1{ font-size:1.4rem; margin:0 0 6px; }
+  header p{ color:var(--sub); margin:0; font-size:0.92rem; }
+
+  .legend{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px 18px; margin:0 0 24px;
+    padding:12px 16px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px;
+    font-size:0.83rem; color:var(--sub); }
+  .legend span{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .dot{ width:12px; height:12px; border-radius:50%; display:inline-block; flex:none; }
+  .line-sample{ width:22px; height:0; border-top:3px solid; display:inline-block; }
+  .line-dashed{ border-top-style:dashed; }
+
+  .diagram-scroll{ overflow-x:auto; background:var(--card-bg); border:1px solid var(--card-border);
+    border-radius:16px; padding:16px; margin-bottom:30px; }
+  .diagram-scroll svg{ display:block; margin:0 auto; }
+  .node-title{ font-size:15px; font-weight:700; fill:var(--text); }
+  .node-time{ font-size:11.5px; fill:var(--sub); }
+  .edge-label{ font-size:11.5px; fill:var(--sub); }
+  .edge-label-strong{ font-size:11.5px; fill:var(--error); font-weight:600; }
+  .edge-label-teal{ font-size:11.5px; fill:var(--teal); font-weight:600; }
+  .edge-label-accent{ font-size:11.5px; fill:var(--accent); font-weight:600; }
+
+  h2.section-title{ font-size:1.05rem; margin:30px 0 14px; }
+  .flow{ display:flex; flex-direction:column; gap:12px; }
+  .step{ background:var(--card-bg); border:1px solid var(--card-border); border-left:6px solid var(--accent);
+    border-radius:14px; padding:13px 18px; }
+  .step.success{ border-left-color:var(--success); }
+  .step.teal{ border-left-color:var(--teal); }
+  .step-head{ display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .num{ flex:none; width:24px; height:24px; border-radius:50%; background:var(--accent-bg); color:var(--accent);
+    font-weight:700; font-size:0.76rem; display:flex; align-items:center; justify-content:center; }
+  .step.success .num{ background:var(--success-bg); color:var(--success); }
+  .step.teal .num{ background:var(--teal-bg); color:var(--teal); }
+  .title{ font-weight:700; font-size:0.97rem; }
+  .desc{ color:var(--sub); font-size:0.88rem; margin:6px 0 0; }
+  .fail-tag{ margin-top:7px; display:inline-flex; align-items:center; gap:6px; background:var(--error-bg); color:var(--error);
+    border:1px dashed var(--error); border-radius:8px; padding:4px 9px; font-size:0.76rem; margin-right:6px; }
+  .quiet-tag{ margin-top:7px; display:inline-flex; align-items:center; gap:6px; background:var(--teal-bg); color:var(--teal);
+    border:1px dashed var(--teal); border-radius:8px; padding:4px 9px; font-size:0.76rem; }
+
+  .error-box{ margin:14px 0 10px; background:var(--error-bg); border:1px solid var(--error); border-radius:14px; padding:14px 18px; }
+  .error-box .num{ background:var(--error); color:#fff; }
+  .error-box .title{ color:var(--error); }
+  .error-box .desc{ color:var(--text); opacity:0.85; }
+
+  footer{ text-align:center; color:var(--sub); font-size:0.76rem; margin-top:32px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="nav">
+    <a href="step2_StickInsert.html">◀ 이전: ② 스틱 확인·초기 점검</a>
+    <a href="systemFlowChart.html">🏠 전체 흐름도로</a>
+    <a href="step4_SampleCheckReaction.html">다음: ④ 샘플량 확인·반응 대기 ▶</a>
+  </div>
+
+  <header>
+    <h1>③ 샘플(소변) 투입 대기 — 세부 흐름도</h1>
+    <p>스틱에 샘플이 투입되는 순간을 최대 5분간 계속 지켜보는 단계입니다.</p>
+  </header>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--accent)"></span>정상 진행 단계</span>
+    <span><span class="dot" style="background:var(--success)"></span>완료(다음 단계로)</span>
+    <span><span class="dot" style="background:var(--teal)"></span>시간 초과(오류 아님)</span>
+    <span><span class="dot" style="background:var(--error)"></span>오류 처리</span>
+    <span><span class="line-sample line-dashed" style="border-color:var(--accent)"></span>반복(아직 미검출)</span>
+  </div>
+
+  <div class="diagram-scroll">
+    <svg width="900" height="760" viewBox="0 0 900 760" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="ahBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+        </marker>
+        <marker id="ahGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--success)"/>
+        </marker>
+        <marker id="ahRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--error)"/>
+        </marker>
+        <marker id="ahTeal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--teal)"/>
+        </marker>
+      </defs>
+
+      <!-- main flow -->
+      <path d="M230,100 L230,160" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <text class="edge-label" x="240" y="135" text-anchor="start">최대 5분간 아래 과정 반복</text>
+
+      <path d="M230,250 L230,290" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+
+      <path d="M230,370 L230,410" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <text class="edge-label" x="240" y="395" text-anchor="start">5분 미만</text>
+
+      <path d="M230,520 L230,590" stroke="var(--success)" stroke-width="3" fill="none" marker-end="url(#ahGreen)"/>
+      <text class="edge-label" x="240" y="560" text-anchor="start" fill="var(--success)">비율이 기준보다 낮아짐 (샘플 감지!)</text>
+
+      <!-- loop-back: N4 -> N3 (left margin) -->
+      <path d="M60,465 L30,465 L30,205 L60,205" stroke="var(--accent)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahBlue)"/>
+      <text class="edge-label-accent" x="8" y="335" text-anchor="middle" transform="rotate(-90 8 335)">아직 미검출 → 반복</text>
+
+      <!-- branch: N3b -> timeout box -->
+      <path d="M400,330 L600,330" stroke="var(--teal)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahTeal)"/>
+      <text class="edge-label-teal" x="410" y="320">5분 경과 (계속 미검출)</text>
+
+      <!-- branch: N3 -> error box -->
+      <path d="M400,205 L600,205" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="410" y="195">스틱 빠짐 감지</text>
+
+      <!-- nodes -->
+      <g>
+        <rect x="60" y="20" width="340" height="80" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="52" text-anchor="middle">🔔 진입</text>
+        <text class="node-time" x="230" y="74" text-anchor="middle">빈 스틱 기준값으로 "샘플 감지 판정 기준"을 미리 계산</text>
+      </g>
+
+      <g>
+        <rect x="60" y="160" width="340" height="90" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="195" text-anchor="middle">⏱ 1초간 스틱 유지 확인</text>
+        <text class="node-time" x="230" y="217" text-anchor="middle">0.25초씩 4번 나눠서 스틱이 그대로 있는지 확인</text>
+        <text class="node-time" x="230" y="233" text-anchor="middle">(반복마다 매번 확인)</text>
+      </g>
+
+      <g>
+        <rect x="60" y="290" width="340" height="80" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="322" text-anchor="middle">⌛ 5분 경과했는가?</text>
+        <text class="node-time" x="230" y="344" text-anchor="middle">진입 시점부터 실제 경과 시간을 확인</text>
+      </g>
+
+      <g>
+        <rect x="60" y="410" width="340" height="110" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="443" text-anchor="middle">🧪 시험선(T) · 보조선(BT) 밝기 측정</text>
+        <text class="node-time" x="230" y="465" text-anchor="middle">두 값의 비율을 계산해 "아직 반응 전" 기준</text>
+        <text class="node-time" x="230" y="481" text-anchor="middle">비율과 비교합니다</text>
+        <text class="node-time" x="230" y="497" text-anchor="middle">→ 비율이 확 낮아지면 샘플이 투입된 것으로 판단</text>
+      </g>
+
+      <g>
+        <rect x="60" y="590" width="340" height="90" rx="14" fill="var(--success-bg)" stroke="var(--success)" stroke-width="2"/>
+        <text class="node-title" x="230" y="623" text-anchor="middle">✅ 샘플 감지!</text>
+        <text class="node-time" x="230" y="645" text-anchor="middle">대조선(BC·C) 밝기도 추가로 측정한 뒤</text>
+        <text class="node-time" x="230" y="661" text-anchor="middle">④ 샘플량 확인 단계로 이동</text>
+      </g>
+
+      <!-- error box -->
+      <g>
+        <rect x="600" y="160" width="260" height="90" rx="16" fill="var(--error-bg)" stroke="var(--error)" stroke-width="2"/>
+        <text class="node-title" x="730" y="193" text-anchor="middle" fill="var(--error)">🚫 오류 처리</text>
+        <text class="node-time" x="730" y="215" text-anchor="middle">원인 기록 → 2분 표시 →</text>
+        <text class="node-time" x="730" y="231" text-anchor="middle">대기 모드로 복귀</text>
+      </g>
+
+      <!-- timeout box -->
+      <g>
+        <rect x="600" y="280" width="260" height="180" rx="16" fill="var(--teal-bg)" stroke="var(--teal)" stroke-width="2"/>
+        <text class="node-title" x="730" y="315" text-anchor="middle" fill="var(--teal)">⌛ 시간 초과</text>
+        <text class="node-time" x="730" y="340" text-anchor="middle">5분 동안 샘플이</text>
+        <text class="node-time" x="730" y="356" text-anchor="middle">감지되지 않음</text>
+        <text class="node-time" x="730" y="385" text-anchor="middle" fill="var(--sub)">오류 화면 표시 없이,</text>
+        <text class="node-time" x="730" y="401" text-anchor="middle" fill="var(--sub)">측정값만 내부에 기록한 뒤</text>
+        <text class="node-time" x="730" y="417" text-anchor="middle" fill="var(--sub)">조용히 대기 모드로 복귀</text>
+        <text class="node-time" x="730" y="441" text-anchor="middle" fill="var(--sub)">(오류가 아니라 "재사용 가능한</text>
+        <text class="node-time" x="730" y="457" text-anchor="middle" fill="var(--sub)">대기 종료"로 취급)</text>
+      </g>
+    </svg>
+  </div>
+
+  <h2 class="section-title">🔎 단계별 자세히 보기</h2>
+
+  <div class="flow">
+    <div class="step">
+      <div class="step-head"><div class="num">1</div><div class="title">🔔 진입 시 판정 기준 계산</div></div>
+      <p class="desc">앞 단계에서 측정해둔 "빈 스틱 기준값"으로, 샘플이 투입되면 얼마나 비율이 낮아져야 "감지됐다"고 볼지 미리 계산해 둡니다.</p>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="num">2</div><div class="title">⏱ 1초 단위로 스틱 유지 확인 + 측정 반복</div></div>
+      <p class="desc">0.25초씩 4번 스틱이 그대로 있는지 확인한 뒤, 시험선·보조선 밝기를 측정해 비율을 계산합니다. 비율이 기준보다 낮아지면 샘플이 투입된 것으로 보고 다음 단계로, 아니면 이 과정을 최대 5분까지 계속 반복합니다.</p>
+      <div class="fail-tag">⚠ 도중 스틱 빠짐 → 오류 처리</div>
+    </div>
+
+    <div class="step teal">
+      <div class="step-head"><div class="num">⌛</div><div class="title">5분 시간 초과 시</div></div>
+      <p class="desc">5분 동안 샘플이 전혀 감지되지 않으면, 오류 화면을 띄우지 않고 그때까지의 측정값만 기기 내부에 기록한 뒤 조용히 대기 모드로 돌아갑니다. 스틱을 다시 꽂으면 처음부터 다시 시작할 수 있습니다.</p>
+      <div class="quiet-tag">ℹ 오류 표시 없음 — 문제가 아니라 "제한 시간 종료"로 취급</div>
+    </div>
+
+    <div class="step success">
+      <div class="step-head"><div class="num">✓</div><div class="title">완료</div></div>
+      <p class="desc">샘플이 감지되면 대조선(BC·C) 밝기까지 추가로 측정한 뒤, ④ 샘플량 확인·반응 대기 단계로 넘어갑니다.</p>
+    </div>
+  </div>
+
+  <div class="error-box">
+    <div class="step-head"><div class="num">!</div><div class="title">🚫 이 단계에서 발생 가능한 오류</div></div>
+    <p class="desc">스틱이 도중에 빠지는 경우만 정식 오류로 처리됩니다(기록 → 2분 표시 → 대기 모드 복귀). 5분 시간 초과는 오류가 아니라 조용한 종료로 별도 처리됩니다.</p>
+  </div>
+
+  <footer>
+    Surearly Multi / MFx_New_Ver — ③ 샘플 투입 대기 세부 흐름도. 관련 함수: <code>DM_App_Main_Sq_Sample_Load_Wait_Step_Handler()</code>.
+  </footer>
+
+</div>
+</body>
+</html>

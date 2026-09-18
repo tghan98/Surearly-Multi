@@ -1,0 +1,26 @@
+STM8L151F3 TSSOP20 MCU 사용 
+시스템 클럭은 2Mhz
+시스템 타이머로 TIM4, LED PWM 출력으로 TIM2 사용 
+ADC 3채널 사용 Pin 설정 참조 
+전원 CR1632 - LDO(2.5V) --VCC
+
+
+/* LED  */ 
+//GPIO
+#define LED_PWM_GPIO_PORT       GPIOB
+#define LED1_GPIO_PORT          GPIOB
+#define LED2_GPIO_PORT          GPIOB
+
+//Pin
+#define LED_PWM_GPIO_PIN        GPIO_Pin_2   
+#define LED1_GPIO_PIN           GPIO_Pin_4   
+#define LED2_GPIO_PIN           GPIO_Pin_3 
+
+
+하드웨어 구조 
+                                                          --- LED1(LTW-C191KGKT) - LED1_GPIO_PIN    
+ LED_PWM_GPIO_PIN  --- 저항 51 ohm ---
+                                                          ---LED2(LTW-C191KGKT) - LED2_GPIO_PIN
+
+
+

@@ -1,0 +1,18 @@
+STM8L151F3_TSSOP20 pin map
+
+LED_PWM : PB2 , PWM, LED Power Control 
+nLED1 : PC0, Open Drain, LED1 ON/OFF
+nLED2 : PC1, Open Drain ,LED2 ON/OFF
+PTR_PW : PB3, Push-Pull OUT, PTR Power ON/OFF
+PTR1 : PB5, ADC
+PTR2 : PB6, ADC
+PTR3 : PB7, ADC
+LCD_COM0 : PB4, Push-Pull OUT, High/Low
+LCD_SEG0 : PC5, Push-Pull OUT, High/Low
+LCD_SEG1 : PC6, Push-Pull OUT, High/Low
+LCD_SEG2 : PD0, Push-Pull OUT, High/Low
+LCD_SEG3 : PB0, Push-Pull OUT, High/Low
+SW_STRIP : PB1, Push-Pull OUT, High/Low
+
+
+

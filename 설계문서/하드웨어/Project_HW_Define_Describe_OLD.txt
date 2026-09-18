@@ -1,0 +1,488 @@
+
+STM8L151F3 TSSOP20 MCU 사용 
+Pin 설정은 아래 pin 설정 참조
+시스템 클럭은 2Mhz
+시스템 타이머로 TIM4, LED PWM 출력으로 TIM2 사용 
+ADC 3채널 사용 Pin 설정 참조 
+
+
+
+MCU pin 설정 
+
+/* LED  */ 
+//GPIO
+#define LED_PWM_GPIO_PORT       GPIOB
+#define LED1_GPIO_PORT          GPIOB
+#define LED2_GPIO_PORT          GPIOB
+
+//Pin
+#define LED_PWM_GPIO_PIN        GPIO_Pin_2   
+#define LED1_GPIO_PIN           GPIO_Pin_4   
+#define LED2_GPIO_PIN           GPIO_Pin_3 
+
+/* Custom LCD */
+//GPIO
+#define LCD_COM0_GPIO_PORT      GPIOC
+
+#define LCD_SEG0_GPIO_PORT	GPIOC
+#define LCD_SEG1_GPIO_PORT	GPIOC
+#define LCD_SEG2_GPIO_PORT	GPIOD
+#define LCD_SEG3_GPIO_PORT	GPIOB
+
+//Pin
+#define LCD_COM0_GPIO_PIN       GPIO_Pin_0
+
+#define LCD_SEG0_GPIO_PIN	GPIO_Pin_5
+#define LCD_SEG1_GPIO_PIN	GPIO_Pin_6
+#define LCD_SEG2_GPIO_PIN       GPIO_Pin_0
+#define LCD_SEG3_GPIO_PIN	GPIO_Pin_0
+
+// LCD Matching --> This Define Use LCD Control
+#define LCD_COM_PORT            LCD_COM0_GPIO_PORT
+
+#define LCD_BOOK_PORT		LCD_SEG0_GPIO_PORT
+#define LCD_DROP_PORT		LCD_SEG1_GPIO_PORT
+#define LCD_YES_PORT            LCD_SEG2_GPIO_PORT
+#define LCD_NO_PORT             LCD_SEG3_GPIO_PIN
+
+#define LCD_COM_PIN             LCD_COM0_GPIO_PIN
+
+#define LCD_BOOK_PIN            LCD_SEG0_GPIO_PIN
+#define LCD_DROP_PIN            LCD_SEG1_GPIO_PIN
+#define LCD_YES_PIN             LCD_SEG2_GPIO_PIN
+#define LCD_NO_PIN              LCD_SEG3_GPIO_PIN
+
+/* COM */
+//USART
+#define USART_PORT		GPIOA
+#define USART_TX_PIN		GPIO_Pin_2
+#define USART_RX_PIN		GPIO_Pin_3
+
+//ADC
+#define ADC_FRNT_PORT           GPIOB
+#define ADC_MIDL_PORT           GPIOB
+#define ADC_REAR_PORT           GPIOB
+
+#define ADC_FRNT_PIN            GPIO_Pin_5
+#define ADC_MIDL_PIN            GPIO_Pin_6
+#define ADC_REAR_PIN            GPIO_Pin_7
+
+#define ADC_IDD_FRNT_CHANNEL    ADC_Channel_13	// Q1,F
+#define ADC_IDD_MIDL_CHANNEL    ADC_Channel_12	// Q2,M
+#define ADC_IDD_REAR_CHANNEL	ADC_Channel_11	// Q3,R
+
+//Strip Check
+#define STP_CK_PORT        GPIOB
+#define STP_CK_PIN         GPIO_Pin_1
+
+
+MCU Pin의 정의는 위와 같다.
+
+1. MCU System Clock은 2MHz로 한다. 
+
+2. GPIO 설정 
+1) LED_PWM_GPIO_PIN은 TIM2_CH2 PWM 출력 설정
+2) LED1_GPIO_PIN, LED2_GPIO_PIN GPIO OUTPUT에 Default High 설정 
+3) LCD Pin은 모두 GPIO OUTPUT 설정에 Default Low 설정 
+4) USART Pin 각 핀에 맞는 설정 
+5) ADC Pin는 각 채널 ADC  Pin 설정 
+
+3. LED1, LED2 PWM 제어 
+1) LED_PWM_GPIO_PIN에서 TIM2_CH2로 5 kHz PWM 출력 듀티로 LED의 광량을 제어 한다.
+(1) High LED ON Time , Low LED OFF Time
+2) LED1_GPIO_PIN과 LED2_GPIO_PIN는 동작할 LED 선택(Pin이 Low 이면 LED ON, High 이면 OFF)
+
+4. LCD 및 STP_CK(스틱 체크)  동작 
+1) TIM4는 10msec 주기 Core 슬립 위이크업 타이머( 10msec Core 슬립 후 스립 해제 해당 인터럽트 코드 동작)
+2) LCD 동작 
+(1) TIM4의 10msec 타임 인터럽트 마다 LCD_COM_PIN 반전 
+(2) OFF 타입에 있는 SEG들은 LCD_COM_PIN과 같은 상으로 동작, ON 타임 일 때 다른 상으로 동작 
+(3) LCD Channel은  각각 혹은 전부 ON, OFF, BLINK(500msec 주기 define으로 변경 가능) 동작을 한다.
+
+
+
+5. 채널간 ADC 실행 
+(1) 채널 선택 ADC 실행 - 100 Kohm Pull down 저항에 22nF 콘덴서라 최대 사이클 필요 300 이상  
+(2) ADC 완료까지 Core Sleep
+
+6. USART 초기 설정 통신 속도 9600 , 수신은 인터럽트로 , 전송은 폴링 방식으로 한다
+초기화 코드 생성하고 수신 인터럽트 생성 
+
+7. STP_CK_PIN는 스틱 삽입 시 Low으로 되고 제거 되면 High가 된다 
+1) half() 모드에서 STP_CK_PIN는에서 하강에지 인터럽트가 발생 하면 Wake up하고 STP_CK_PIN이 150msec 동안 스틱이 삽입 상태 인지 확인한다.
+2) 삽입 상태이면 Wake up 상태를 유지 하고 다음 실행 준비를 하고 오동작으로 발생한 인터럽트면 다시 half()모드가 되고 STP_CK_PIN에 하강에지 인터럽트를 대기 한다.
+3) wake up 용으로만 인터럽트를 사용하고 Run 상태에서는 Input 상태로 Pin 상태를 TIM4 인터럽트에서 주기 적으로 확인하여 
+
+
+8. LCD 배열 생성 
+
+#define LCD_BOOK_PORT		LCD_SEG0_GPIO_PORT
+#define LCD_DROP_PORT		LCD_SEG1_GPIO_PORT
+#define LCD_YES_PORT            LCD_SEG2_GPIO_PORT
+#define LCD_NO_PORT             LCD_SEG3_GPIO_PIN
+
+#define LCD_BOOK_PIN            LCD_SEG0_GPIO_PIN
+#define LCD_DROP_PIN            LCD_SEG1_GPIO_PIN
+#define LCD_YES_PIN             LCD_SEG2_GPIO_PIN
+#define LCD_NO_PIN              LCD_SEG3_GPIO_PIN
+
+LCD 채널 
+typedef enum
+{
+CH_LCD_BOOK = 0,
+CH_LCD_DROP,
+CH_LCD_YES,
+CH_LCD_NO,
+
+CH_LCD_ALL
+}LCD_CH_t;
+
+const GPIO_TypeDef * LCD_PORT[CH_LCD_ALL] = {LCD_BOOK_PORT, LCD_DROP_PORT, LCD_YES_PORT, LCD_NO_PORT};
+const uint8_t LCD_PIN[CH_LCD_ALL] = {LCD_BOOK_PIN, LCD_DROP_PIN, LCD_YES_PIN, LCD_NO_PIN};
+
+LCD_SEG_Control(LCD_CH_t tCh, Pin_State);
+LCD_COM(Pin_State);
+
+이런식으로 코드를 작성 해줘
+
+
+8. STP_CK_PIN 채터링에 따른 State 출력 
+1) STP_CK_PIN이 GPIO INPUT 모드에서 스틱이 삽입 되면 Low, 분리되면 High가 되는데 100K Pull-up 저항과 채터닝 필터용 100nF 콘덴서가 붙어 있다
+2) TIM4 10msec systemtick에서 채터링이나 노이즈를 필더링할 코드를 작성 해줘, 필터링 시간은 150msec로 보고 있고 define 값으로 수정 할 수 있어 
+3) 보다 좋은 솔루션이 있으면 제시 할 수 있어
+
+
+9. EEPROM 인터페이스 작성 
+(1) start address 부터 요청한 byte 수만큼 write 하는 함수 
+(2) start address 부터 요청한 byte 수만큼 Read 하는 함수
+
+10. 구조 구상: Main 루프와 TIM4 루프 두개의 테스크로 동작
+1) Main Loop 시퀀스 동작 :ADC, 시퀀스 흐름제어, 스틱 확인을 여기서 한다.
+(1) Step : 
+IDLE_Step : MCU Halt Mode 진입, Wake Up 및 변수 초기화
+Stick Insert Step : 삽입 된 스틱 상태 확인,  EEPROM Read(Insert Count  이건 무제한, Scan Complete Count > 30 Error), LED 광량 보정 ,Empty Band 측정 
+Sample Load Wait Step : 샘플이 로딩 대기 5분,  T Band 측정 후 Empty T Band 비교 
+Over Sample Check Step
+Low Sample Check Step
+Reaction Wait Step
+Result Scan Step
+Result Out Step : Yes or No 출력 
+Error Wait Step
+
+2) Tim4 인터럽트 시퀀스에 맞는 LCD 동작 :  TIM4 10msec SystemTick에서 구동 시킴 
+LCD IDLE Step
+LCD Stick Insert Step
+LCD Sample Load Wait Step
+LCD Over Sample Check Step
+LCD Low Sample Check Step
+LCD Reaction Wait Step
+LCD Result Scan Step
+LCD Result Out Step
+LCD Error Out Step
+
+
+ @USER/User_Main.c 에 Main Loop에 Main Sq Step을 LCD Sq Step을 TIM4 인터럽트에 코드를 배치하고 세부 코드는 Main SQ는
+ @USER/App/DM_Main_Sq_App.c 에 작성 하고  LCD 세부 내용은 @USER/App/DM_LCD_Stick_Check_App.c 에서 작성 할거야
+   
+11. EEPROM
+1) 1 Byte의 Insert Count Read Write 함수를 만들어 줘, Read 시 0xFF 값이면 0으로 해당 ROM Byte를 초기화 함.
+2) 1 Byte의 Test Complete Count을 Read Write 함수를 만들어 줘, Read 시 0xFF 값이면 0으로 해당 ROM Byte를 초기화 함
+3) 스팁 삽입 시 읽은 초기값 저장할 Read write, LED1, LED2 PWM Count 199 /399 , LED1 로 PTR1, PTR2 저장, LED2로 PTR2 PTR3 저장  short형 8개 데이터를 저장하고 읽을 함수를 작성 해줘
+교정데이터 저장은 필요 없어 삽입 후 카세트 PTR 값(short형) 8개를 읽고 쓰는 함수를 작성 해줘
+4) 1 byte Error Step을 Read Write 함수를 만들어 줘 Test Complete Count 다음 주소에 위치하게 해줘
+5) 1 Byte의 Error Code를 Read Write 함수를 만들어 줘  Error Step 다음 주소에 위치하게 해줘
+6) 결과 저장 결과 값(short형) 16개를 ROM에 Write Read, 0 ~ 6 채널까지 저장 할 수 있고 절달인자인 Test Complete Count가 7의 배수가가 되면(Test Complete Count % 7  = 0) 0채널 부터 6채널까지 Overwrite 함 
+
+
+Optic_LED[] = {CH_LED_1, CH_LED_1, CH_LED_2, CH_LED_2}
+Optic_LED_PWM[] ={ 199, 199, 199, 199};
+Optic_ADC[] = { ADC_IDD_FRNT_CHANNEL, ADC_IDD_MIDL_CHANNEL, ADC_IDD_MIDL_CHANNEL, ADC_IDD_REAR_CHANNEL};
+
+    /* 4. Wait for LED and Sensor stabilization */
+    DM_HW_Drv_SystemSleep_10ms();
+
+    /* 5. Read ADC value from the mapped channel */
+    wResult = DM_HW_Drv_ADC_Read(gs_tOptic_ADC[tCh]);
+
+10번 해서 가운데 6개만 평균 내서 리턴 하는 코드로 수정 해줘
+추가로 PWM 값은 전달 인자료 받게 해줘
+
+삽입 시 스틱의 초기 값을 읽는 옵틱 채널 당 PWM 199 399 값으로 측정한 PTR 값을 전역 변수 배열에 저장하는 함수를 작성 해줘 
+
+gs_awInitialStickPtr[] 값을 가저와서(PWM(199, 399)) "전달 인자"로 받은 값으로 PTR ADC 값으로 튜닝하는(+-20 Count 이내 20은 define 으로 수정 가능)
+함수를 DM_Optic_Handle_App.c DM_Optic_Handle_App.h에 작성 해줘 역시 대략 200msec 간격으로 stick 채크 해서 리턴해야 한다.
+ 
+
+DM_Optic_Handle_App.h에 오류가 있어 수정해줘
+
+Empty PTR 전역 변수 배열를 만들고 각 튜닝 값으로 측정한 각 값을 저장하는 함수를 만들어 그리고 Empty PTR 전역 변수 배열을 인터페이스 할 수 있는 함수도 만들어 줘
+DM_Optic_Handle_App.c DM_Optic_Handle_App.h에 만들어야 되고
+
+Result PTR 전역 변수 배열을 만들고 각 튜닝 값으로 측정한 각 값을 저장하는 함수를 만들어 Result PTR 전역 변수 배열을 인터페이스 할 수 있는 함수도 만들어 줘 
+DM_Optic_Handle_App.c DM_Optic_Handle_App.h에 만들어야 되고
+
+DM_App_Optic_TuneTargetADC() 5회 튜닝 후에도 범위 안에 못들어 오면 FAIL_OPTIC_CH0 0x10 FAIL_OPTIC_CH1 0x11 FAIL_OPTIC_CH2 0x12 FAIL_OPTIC_CH3 0x13
+리턴 하도록 코드를 수정 해줘 
+
+
+LCD Stick Insert Step 정의
+ALL ON : 500msec
+ALL OFF : 500msec
+
+ALL ON : 500msec
+ALL OFF : 500msec
+
+ALL ON : 500msec
+LCD ALL OFF 
+
+DROP : 500msec
+ALL OFF
+
+YES : 500msec
+ALL OFF
+
+NO : 500msec
+ALL OFF
+
+BOOK : 500msec
+ALL OFF
+
+DROP : 500msec                                 
+
+동작이 완료 되면 LCD IDLE Step 이 된다.
+해당 정이 내용으로 LCD Stick Insert Step 함수를 만들어줘 
+
+
+LCD_SQ_SAMPLE_LOAD_WAIT Step 정의는 DROP 표시 후 LCD IDLE Step이 된다.
+
+LCD_SQ_REACTION_WAIT Step 정의는 DROP blink 설정 후 LCD IDLE Step이 된다.
+
+case LCD_SQ_ERROR_OUT:을 삭제하고 LCD_SQ_ERR_STICK_REMOVE, LCD_SQ_ERR_STICK_FAIL, LCD_SQ_ERR_OVER_USED, LCD_SQ_ERR_DEV_FAIL
+이렇게 4개를 추가 해줘
+
+case LCD_SQ_RESULT_OUT: 을 삭제하고 LCD_SQ_RESULT_YES, LCD_SQ_RESULT_NO 이렇게 두개를 추가 해줘
+
+
+LCD_SQ_ERR_OVER_USED Step
+ALL OFF
+BOOK : 500msec
+ALL OFF
+NO : 500msec
+ALL OFF
+YES : 500msec
+ALL OFF
+DROP : 500msec
+Main SQ에서 Halt 모드 진입 까지 해당 에니메이션 반복
+
+LCD_SQ_ERR_STICK_REMOVE  Step
+ALL OFF
+BOOK ON
+DROP Blink 
+동작 설정 완료 후 LCD_SQ_IDLE Step이 됨
+
+
+LCD_SQ_ERR_STICK_FAIL Step
+ALL OFF
+BOOK ON
+동작 설정 완료 후 LCD_SQ_IDLE Step이 됨
+
+LCD_SQ_RESULT_YES Step
+ALL OFF
+YES ON
+동작 설정 완료 후 LCD_SQ_IDLE Step이 됨
+
+LCD_SQ_RESULT_NO Step
+ALL OFF
+NO ON
+동작 설정 완료 후 LCD_SQ_IDLE Step이 됨
+
+
+DM_Main_Sq에 다음과 같은 전역 변수 선언
+
+1) Stick Insert Cnt (uint8_t)
+2) Test Complete Count(uint8_t)
+3) EmptyBand_LowData[4]; 
+Enum 으로 다음과 같이 선언: T Band, BT Band(Blank), BC Band(Blank), C Band 
+각각은 OPTIC_CH_0, OPTIC_CH_1, OPTIC_CH_2, OPTIC_CH_3에 대응 된다.
+4) ResultBand Low Data[4];
+
+static uint8_t gs_bStickInsertCnt = 0;
+static uint8_t gs_bTestCompleteCount = 0;
+static uint16_t gs_awEmptyBand_LowData[BAND_MAX];
+static uint16_t gs_awResultBand_LowData[BAND_MAX];
+
+
+에러 코드 부터 정의하자 
+DM_Main_Sq_App에 에로 코드 정의 Sample Wait의 C 밴드(Optics CH3)에 변화가
+생기기 전에 발생하는 Stick Remove는  Error Stick Remove 0x01) 부터 시작 
+그 후 Stick Remove는 Error Stick Fail (0x02) Over Flow Step에서 발생하는 Over Flow 에러는 Error Over Flow(0x03)    Low Sample Step은 Error Low Sample(0x04) 
+FAIL_OPTIC_CH0 이면 동일하게 해당 값을 에러 코드로 사용 한다.
+에러 코드를 정의 해줘 
+
+MAIN_SQ_STICK_INSERT Step
+
+1) EEPROM으로 부터 gs_bStickInsertCnt, gs_bTestCompleteCount 읽어 온다
+2) gs_bStickInsertCnt +1 증가, gs_bTestCompleteCount은 _nSCAN_MAX_CNT 이상이면 
+gs_bErrorCode에 Overused 에러 저장, Main Sq Step은 MAIN_SQ_ERROR_WAIT로 LCD는 LCD_SQ_ERR_OVER_USED로 이동 한다. 
+3) DM_App_Optic_MeasureInitialStick() 초기값 읽는다. 리턴 값이 OPTIC_ERR_STICK_REMOVED면 gs_bErrorCode에 ERROR_STICK_REMOVE 저장 Main Sq Step은 MAIN_SQ_ERROR_WAIT로 LCD는 LCD_SQ_ERR_STICK_REMOVE로 이동 한다.
+4) DM_App_Optic_TuneTargetADC 실행해서 튜닝 진행 리턴값에 따라서 OPTIC_ERR_STICK_REMOVED는 gs_bErrorCode에 ERROR_STICK_REMOVE 저장 Main Sq Step은 MAIN_SQ_ERROR_WAIT로 LCD는 LCD_SQ_ERR_STICK_REMOVE로 이동 다른 에러면 에러코드를 gs_bErrorCode에 저장하고 Main Sq Step은 MAIN_SQ_ERROR_WAIT로 LCD는 LCD_SQ_ERR_STICK_FAIL로 이동한다.
+5) DM_App_Optic_MeasureEmptyPTR을 실행해 해당 값을 gs_awEmptyBand_LowData에 저장한다. 
+6) Main Sq Step은 MAIN_SQ_SAMPLE_LOAD_WAIT LCD는 LCD_SQ_SAMPLE_LOAD_WAIT 이동한다.
+
+DM_App_Main_Sq_Stick_Insert_Step_Handler() 다음 스탭으로 넘어가는건 해당 스탭의 코드를 완료하고 LCD_SQ_STICK_INSERT
+   스탭이 LCD_SQ_IDLE이 됬을 때야
+
+
+    /* 6. LCD_SQ_STICK_INSERT 스탭이 완료되어 LCD_SQ_IDLE이 됬을 때 다음 단계로 이동 */
+    if (DM_App_LCD_Sq_Get_Step() == LCD_SQ_IDLE)
+    {
+        DM_App_LCD_Sq_Set_Step(LCD_SQ_SAMPLE_LOAD_WAIT);
+        DM_App_Main_Sq_Set_Step(MAIN_SQ_SAMPLE_LOAD_WAIT);
+    }
+
+이 코드에서 10msec 슬립과 Stick Inert체크를 하면서 DM_App_LCD_Sq_Get_Step() == LCD_SQ_IDLE을 기달려야 하는거 아닌가?
+
+
+@USER/App/DM_Main_Sq_App.c 에 uint8_t의 Error Sequence를 저장할 전역 변수를 생성 해줘고 해당 변수을 읽고 쓸 수 있는 각각의 함수를 작성
+   해줘
+
+> CalculateIntensity() 이 함수의 계산식 코드를 설명 해줘 4번을 반복하는 이유를 모르겠어
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+✦ CalculateIntensity() 함수가 4번 반복되는 이유는 실수(float) 연산을 사용하지 않고 정수 연산만으로 소수점 셋째 자리까지의 정밀도(총 4자리의
+  유효숫자)를 얻기 위해서입니다.
+
+  이 방식은 초등학교 때 배우는 '세로셈 나눗셈' 원리를 그대로 코드로 옮긴 것입니다.
+
+  1. 코드의 동작 원리 (세로셈 나눗셈)
+
+  루프 내부를 한 단계씩 뜯어보면 다음과 같습니다.
+
+   1 for(nCnt=0; nCnt<4; nCnt++){
+   2   tmp = Divedend / Divisor;           // 1. 현재 몫(한 자리)을 구함
+   3   Quotient = Quotient * 10 + tmp;     // 2. 결과값 자릿수를 올리고 몫을 더함
+   4   Divedend = Divedend - tmp * Divisor; // 3. 나머지를 구함 (Divedend % Divisor와 동일)
+   5
+   6   Divedend = Divedend * 10;           // 4. 나머지에 10을 곱해 다음 자릿수 계산 준비
+   7 }
+
+  2. 4번 반복하는 이유: "고정 소수점(Fixed-point) 구현"
+
+  만약 100을 80으로 나눈다고 가정해 보겠습니다. (결과는 1.25)
+
+   * 1회차 (1의 자리): 100 / 80 = 1. 결과: 1. 나머지: 20. 다음 계산을 위해 20 * 10 = 200으로 만듦.
+   * 2회차 (소수점 첫째): 200 / 80 = 2. 결과: 12. 나머지: 40. 다음 계산을 위해 40 * 10 = 400으로 만듦.
+   * 3회차 (소수점 둘째): 400 / 80 = 5. 결과: 125. 나머지: 0. 다음 계산을 위해 0 * 10 = 0으로 만듦.
+   * 4회차 (소수점 셋째): 0 / 80 = 0. 결과: 1250.
+
+  결과적으로 1.25라는 값을 1250이라는 정수로 얻게 됩니다. 즉, 결과값에 1000을 곱한 효과를 내어 정밀도를 확보하는 것입니다.
+
+  3. 왜 그냥 (Divedend * 1000) / Divisor를 안 하나요?
+
+  가장 중요한 질문입니다. 보통은 (A * 1000) / B를 하면 간단합니다. 하지만 이 펌웨어에서는 다음 두 가지 이유로 위와 같은 루프 방식을
+  사용합니다.
+
+   1. 오버플로우(Overflow) 방지:
+       * 현재 변수 타입이 uint16_t (최대값 65,535)입니다.
+       * 만약 Divedend가 ADC 측정값인 3000이라면, 여기에 1000을 곱하는 순간 3,000,000이 되어 16비트 범위를 훌쩍 넘어가 버립니다.
+       * 루프 방식을 쓰면 중간 계산값이 항상 Divisor * 10 수준을 넘지 않으므로 안전합니다.
+
+   2. STM8L의 성능 최적화:
+       * 8비트 MCU인 STM8은 32비트 나눗셈이나 실수 연산이 매우 느리고 코드 용량을 많이 차지합니다.
+       * 위 방식은 단순한 16비트 나눗셈과 곱셈만 반복하므로 매우 효율적입니다.
+
+  결론
+  이 함수는 "16비트라는 좁은 방 안에서 오버플로우 없이 소수점 셋째 자리까지 정밀한 나눗셈 결과(정수 형태)를 얻기 위한 최적의
+  알고리즘"입니다.
+
+  이렇게 얻은 결과값(1250 등)은 Parameter_define.h에 정의된 1040, 1050 같은 임계값(Threshold)과 직접 비교하는 데 사용됩니다. (1.040, 1.050의
+  의미)
+▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄▄
+ > 해당 함수는 버그나 연산에 문제가 없는건가?
+▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀▀
+✦ 결론부터 말씀드리면, 현재 프로젝트의 하드웨어 사양(STM8L 12비트 ADC) 내에서는 안전하게 설계된 코드입니다. 하지만 입력 데이터의 범위가 커질
+  경우 잠재적인 위험 요소는 존재합니다.
+
+  구체적으로 분석한 내용은 다음과 같습니다.
+
+  1. 오버플로우(Overflow) 위험 분석
+  이 함수에서 가장 위험한 부분은 Divedend = Divedend * 10;입니다.
+
+   * 안전한 이유: STM8L의 ADC는 12비트(0~4095)입니다. 루프 내부에서 Divedend는 항상 Divisor보다 작은 상태(나머지 값)가 됩니다. 따라서
+     Divedend * 10의 최대값은 약 4095 * 10 = 40,950 수준입니다.
+   * 데이터 타입: Divedend는 uint16_t이므로 최대 65,535까지 저장할 수 있습니다. 즉, 40,950은 이 범위 안에 들어오므로 계산 과정에서 데이터가
+     깨지지 않습니다.
+   * 주의 사항: 만약 나중에 다른 용도로 사용하면서 Divisor 값이 6,554 이상인 데이터를 넣게 되면, 6554 * 10 = 65,540이 되어 오버플로우가
+     발생하고 계산 결과가 엉뚱하게 나올 수 있습니다.
+
+  2. 연산 범위(Magnitude)의 한계
+   * 결과값 한계: 결과인 Quotient 역시 uint16_t입니다.
+   * 만약 Divedend가 Divisor보다 65배 이상 크다면 (예: 6500 / 100), 결과값은 65,000을 넘게 되어 오버플로우가 발생합니다.
+   * 하지만 광학 센서 특성상 측정값(Divedend)이 기준값(Divisor)의 65배가 되는 상황은 센서 고장이 아닌 이상 발생하기 어렵기 때문에, 실제
+     사용에는 문제가 없습니다.
+
+  3. 반올림이 아닌 '버림(Truncation)'
+   * 이 함수는 소수점 넷째 자리에서 반올림하는 것이 아니라 그냥 버립니다.
+   * 예를 들어 실제 계산값이 1259.9라면, 수학적으로는 1260이 맞지만 이 함수는 1259를 반환합니다.
+   * 의료 기기 판정 로직에서는 일관성이 중요하므로, 모든 데이터에 동일한 '버림'이 적용된다면 임계값(Threshold) 설정 시 이를 감안했을
+     것이므로 버그라고 보기는 어렵습니다.
+
+  4. 제로 나누기(Division by Zero) 방어
+   * if(Divedend && Divisor) 조건문이 있어, Divisor가 0일 때 시스템이 멈추거나 에러가 발생하는 것을 방지하고 0을 반환하도록 되어 있습니다.
+     이는 임베디드 환경에서 매우 바람직한 예외 처리입니다.
+
+  요약
+   * 버그인가? 아닙니다. 12비트 ADC 값을 처리하기 위해 메모리와 연산 속도를 최적화한 기법입니다.
+   * 문제가 생길 조건: 입력 파라미터가 6554를 넘어가거나, 결과값이 65535를 넘어가는 매우 큰 수의 나눗셈을 할 때는 사용할 수 없습니다.
+   * 현재 프로젝트에서는? ADC 값이 4095 이하이므로 아무 문제 없이 정상 동작합니다.
+
+
+
+ > @USER/Utill/ 에 DM_Utill.c DM_Utill.h을 만들고 uint16_t CalculateIntensity(uint16_t Divedend, uint16_t Divisor)
+   {
+     uint16_t Quotient, tmp;
+     uint8_t nCnt;
+
+     Quotient = 0;
+     if(Divedend && Divisor){
+       for(nCnt=0; nCnt<4; nCnt++){
+         tmp = Divedend / Divisor;
+         Quotient = Quotient * 10 + tmp;
+         Divedend = Divedend - tmp * Divisor;
+
+         Divedend = Divedend * 10;
+       }
+     }
+     return Quotient;
+   } 해당 코드를 생성하고 @USER/App/DM_Main_Sq_App.c에 인클루드 시켜줘
+
+
+if (wT1_Ratio < wFinal_T0_Ratio) 가 참일때, BC(OPTIC_CH_2), C(OPTIC_CH_3)을 측정해서 gs_awResultBand_LowData[]에 넣어줘
+
+ gs_awResultBand_LowData[]에 저장 된 C 값과 _nOVER_FLOW_RATIO값을 Cal_Ratio()에 넣어 나온 값이 5초 후 측정한 C 값보다 크면 MAIN_SQ_LOW_SAMPLE_CHECK 스탭으로 이동 LCD는 IDLE 유지한다. Stick Remove 상태가 되면 에러 처리, C값이 작으면 ERROR_OVER_FLOW이고 Error Step으로 이동 LCD는 Stick Fail 에러 이동 한다.
+
+
+MAIN_SQ_LOW_SAMPLE_CHECK Setp
+20초 후에 C 값을 읽어서 Empty C와 _nSMALL_SAMPLE_RATIO을 Cal_Ratio()에 나온 값과 비교해서 작으면 MAIN_SQ_REACTION_WAIT 이동 아니면 ERROR_OVER_FLOW이고 Error 스탭으로 이동하고 LCD는 Stick Fail 이동, Stick Remove면 에러처리 한다.
+
+gs_awEmptyBand_LowData[], gs_awResultBand_LowData[], gs_awResult[], gs_wOptic_PWM[] 이 값들과 더미 2byte를 합처서 32byte를 DM_App_Rom_Save_CurrentResult()로 저장 해야 되하는데 DM_Main_Sq에 인터페이스 함수를 만들어줘
+
+
+DM_App_Rom_Get_StickPtrData()
+
+void DM_App_Main_Sq_Send_CSV_Data(void)에서 
+
+uint8_t DM_App_Optic_MeasureInitialStick(void)에서 버퍼를 포인터로 전달하게 수정하고 static uint16_t gs_awInitialStickPtr[8] = {0,}을 DM_Main_sq로 이동시켜
+
+
+@DM_Main_Sq_App.c 의 DM_App_Main_Sq_Idle_Step_Handler()에 보면 
+
+    for (i = 0; i < 20; i++) /* 20 * 10ms = 200ms */
+    {
+        DM_HW_Drv_SystemSleep_10ms();
+    }
+
+코드가 있는데, 목적은 채터링 타이머 10msec 200msec를 기달려서 Stick insert 상태가 되게 하려는 건데
+채터링으로 인터럽트가 걸려서 딜레이가 적용 되지 않고 있어 
+이건 어떻게 수정 해야 할지 제시 해봐
+
+

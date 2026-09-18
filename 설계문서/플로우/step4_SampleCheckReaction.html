@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>④ 샘플량 확인·반응 대기 - Surearly Multi</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card-bg:#ffffff; --card-border:#d7dee6;
+    --text:#1c2530; --sub:#5b6b7a;
+    --accent:#2f6fed; --accent-bg:#eaf1ff;
+    --error:#d3402f; --error-bg:#fdecea;
+    --idle:#6a4bd6; --idle-bg:#efe9fb;
+    --success:#1f9d55; --success-bg:#e7f8ee;
+    --teal:#0f8a8a; --arrow:#9aa7b4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12161c; --card-bg:#1b212a; --card-border:#2c3543;
+      --text:#e7ecf2; --sub:#9fb0c0;
+      --accent:#6fa3ff; --accent-bg:#1c2c4a;
+      --error:#ff6b5a; --error-bg:#3a1f1c;
+      --idle:#b79bff; --idle-bg:#2a2140;
+      --success:#4ddb8c; --success-bg:#123a26;
+      --teal:#4fd6d6; --arrow:#586576;
+    }
+  }
+  *{ box-sizing:border-box; }
+  body{ margin:0; background:var(--bg); color:var(--text);
+    font-family:"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif; line-height:1.55; }
+  .wrap{ max-width:980px; margin:0 auto; padding:24px 20px 80px; }
+
+  .nav{ display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:18px; flex-wrap:wrap; }
+  .nav a{ color:var(--accent); text-decoration:none; font-size:0.88rem; font-weight:600;
+    background:var(--accent-bg); padding:6px 12px; border-radius:999px; white-space:nowrap; }
+  .nav a:hover{ text-decoration:underline; }
+
+  header{ text-align:center; margin-bottom:20px; }
+  header h1{ font-size:1.4rem; margin:0 0 6px; }
+  header p{ color:var(--sub); margin:0; font-size:0.92rem; }
+
+  .legend{ display:flex; flex-wrap:wrap; justify-content:center; gap:10px 18px; margin:0 0 24px;
+    padding:12px 16px; background:var(--card-bg); border:1px solid var(--card-border); border-radius:12px;
+    font-size:0.83rem; color:var(--sub); }
+  .legend span{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .dot{ width:12px; height:12px; border-radius:50%; display:inline-block; flex:none; }
+  .line-sample{ width:22px; height:0; border-top:3px solid; display:inline-block; }
+  .line-dashed{ border-top-style:dashed; }
+
+  .diagram-scroll{ overflow-x:auto; background:var(--card-bg); border:1px solid var(--card-border);
+    border-radius:16px; padding:16px; margin-bottom:30px; }
+  .diagram-scroll svg{ display:block; margin:0 auto; }
+  .node-title{ font-size:15px; font-weight:700; fill:var(--text); }
+  .node-time{ font-size:11.5px; fill:var(--sub); }
+  .edge-label{ font-size:11.5px; fill:var(--sub); }
+  .edge-label-strong{ font-size:11.5px; fill:var(--error); font-weight:600; }
+  .edge-label-green{ font-size:11.5px; fill:var(--success); font-weight:600; }
+
+  h2.section-title{ font-size:1.05rem; margin:30px 0 14px; }
+  .flow{ display:flex; flex-direction:column; gap:12px; }
+  .step{ background:var(--card-bg); border:1px solid var(--card-border); border-left:6px solid var(--accent);
+    border-radius:14px; padding:13px 18px; }
+  .step.success{ border-left-color:var(--success); }
+  .step-head{ display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .num{ flex:none; width:24px; height:24px; border-radius:50%; background:var(--accent-bg); color:var(--accent);
+    font-weight:700; font-size:0.76rem; display:flex; align-items:center; justify-content:center; }
+  .step.success .num{ background:var(--success-bg); color:var(--success); }
+  .title{ font-weight:700; font-size:0.97rem; }
+  .desc{ color:var(--sub); font-size:0.88rem; margin:6px 0 0; }
+  .fail-tag{ margin-top:7px; display:inline-flex; align-items:center; gap:6px; background:var(--error-bg); color:var(--error);
+    border:1px dashed var(--error); border-radius:8px; padding:4px 9px; font-size:0.76rem; margin-right:6px; }
+
+  .error-box{ margin:14px 0 10px; background:var(--error-bg); border:1px solid var(--error); border-radius:14px; padding:14px 18px; }
+  .error-box .num{ background:var(--error); color:#fff; }
+  .error-box .title{ color:var(--error); }
+  .error-box .desc{ color:var(--text); opacity:0.85; }
+
+  footer{ text-align:center; color:var(--sub); font-size:0.76rem; margin-top:32px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="nav">
+    <a href="step3_SampleLoadWait.html">◀ 이전: ③ 샘플 투입 대기</a>
+    <a href="systemFlowChart.html">🏠 전체 흐름도로</a>
+    <a href="step5_ResultScan.html">다음: ⑤ 최종 측정·판독 ▶</a>
+  </div>
+
+  <header>
+    <h1>④ 샘플량 확인 · 반응 대기 — 세부 흐름도</h1>
+    <p>샘플이 너무 많거나 적지 않은지 먼저 확인한 뒤, 화학 반응이 끝날 때까지 총 3분을 기다리는 단계입니다.</p>
+  </header>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--accent)"></span>정상 진행 단계</span>
+    <span><span class="dot" style="background:var(--success)"></span>완료(다음 단계로)</span>
+    <span><span class="dot" style="background:var(--error)"></span>오류 처리</span>
+    <span><span class="line-sample" style="border-color:var(--success)"></span>정상 판정</span>
+    <span><span class="line-sample line-dashed" style="border-color:var(--error)"></span>오류 발생 경로</span>
+  </div>
+
+  <div class="diagram-scroll">
+    <svg width="900" height="1080" viewBox="0 0 900 1080" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="ahBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+        </marker>
+        <marker id="ahGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--success)"/>
+        </marker>
+        <marker id="ahRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--error)"/>
+        </marker>
+      </defs>
+
+      <!-- main flow -->
+      <path d="M230,90 L230,120" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <path d="M230,200 L230,230" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <path d="M230,320 L230,350" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+
+      <path d="M230,450 L230,480" stroke="var(--success)" stroke-width="3" fill="none" marker-end="url(#ahGreen)"/>
+      <text class="edge-label-green" x="240" y="470">정상 (과다 유입 아님)</text>
+
+      <path d="M230,560 L230,590" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <path d="M230,680 L230,710" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+
+      <path d="M230,810 L230,840" stroke="var(--success)" stroke-width="3" fill="none" marker-end="url(#ahGreen)"/>
+      <text class="edge-label-green" x="240" y="830">정상 (충분히 반응됨)</text>
+
+      <path d="M230,930 L230,960" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+
+      <!-- error branches -->
+      <path d="M400,275 L600,275" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="410" y="265">스틱 빠짐 / 불량</text>
+
+      <path d="M400,400 L600,400" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="410" y="418">기준 이하 → 샘플 과다 유입</text>
+
+      <path d="M400,635 L600,635" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="410" y="625">스틱 빠짐 / 불량</text>
+
+      <path d="M400,760 L600,760" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="410" y="778">기준 이상 → 샘플 부족</text>
+
+      <path d="M400,885 L600,885" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="410" y="875">스틱 빠짐 / 불량</text>
+
+      <!-- nodes -->
+      <g>
+        <rect x="60" y="20" width="340" height="70" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="52" text-anchor="middle">🔔 진입: 샘플 감지 직후</text>
+        <text class="node-time" x="230" y="72" text-anchor="middle">이전 단계에서 넘어온 대조선 초기값 사용</text>
+      </g>
+
+      <g>
+        <rect x="60" y="120" width="340" height="80" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="153" text-anchor="middle">🧮 과다 유입 판정 기준값 계산</text>
+        <text class="node-time" x="230" y="175" text-anchor="middle">샘플 감지 시점의 대조선(C) 밝기 기준으로 계산</text>
+      </g>
+
+      <g>
+        <rect x="60" y="230" width="340" height="90" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="263" text-anchor="middle">⏱ 5초 대기</text>
+        <text class="node-time" x="230" y="285" text-anchor="middle">스틱이 그대로 있는지 확인하며 5초 기다림</text>
+      </g>
+
+      <g>
+        <rect x="60" y="350" width="340" height="100" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="383" text-anchor="middle">📡 대조선(C) 밝기 재측정</text>
+        <text class="node-time" x="230" y="405" text-anchor="middle">방금 계산한 과다유입 기준값과 비교</text>
+        <text class="node-time" x="230" y="421" text-anchor="middle">(짧은 시간에 너무 많이 떨어졌는지 확인)</text>
+      </g>
+
+      <g>
+        <rect x="60" y="480" width="340" height="80" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="513" text-anchor="middle">🧮 샘플 부족 판정 기준값 계산</text>
+        <text class="node-time" x="230" y="535" text-anchor="middle">빈 스틱 기준(대조선) 밝기로 계산</text>
+      </g>
+
+      <g>
+        <rect x="60" y="590" width="340" height="90" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="623" text-anchor="middle">⏱ 20초 대기</text>
+        <text class="node-time" x="230" y="645" text-anchor="middle">스틱이 그대로 있는지 확인하며 20초 기다림</text>
+      </g>
+
+      <g>
+        <rect x="60" y="710" width="340" height="100" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="743" text-anchor="middle">📡 대조선(C) 밝기 재측정</text>
+        <text class="node-time" x="230" y="765" text-anchor="middle">방금 계산한 샘플부족 기준값과 비교</text>
+        <text class="node-time" x="230" y="781" text-anchor="middle">(충분히 반응이 진행됐는지 확인)</text>
+      </g>
+
+      <g>
+        <rect x="60" y="840" width="340" height="90" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="873" text-anchor="middle">⏳ 나머지 반응 시간 대기</text>
+        <text class="node-time" x="230" y="895" text-anchor="middle">앞의 확인 시간(25초)을 뺀 나머지를 채워 총 3분</text>
+      </g>
+
+      <g>
+        <rect x="60" y="960" width="340" height="80" rx="14" fill="var(--success-bg)" stroke="var(--success)" stroke-width="2"/>
+        <text class="node-title" x="230" y="995" text-anchor="middle">✅ 완료</text>
+        <text class="node-time" x="230" y="1017" text-anchor="middle">⑤ 최종 측정·판독 단계로 이동</text>
+      </g>
+
+      <!-- error box -->
+      <g>
+        <rect x="600" y="230" width="260" height="700" rx="16" fill="var(--error-bg)" stroke="var(--error)" stroke-width="2"/>
+        <text class="node-title" x="730" y="555" text-anchor="middle" fill="var(--error)">🚫 오류 처리</text>
+        <text class="node-time" x="730" y="580" text-anchor="middle">원인을 기기 내부에 기록하고</text>
+        <text class="node-time" x="730" y="598" text-anchor="middle">화면에 오류 메시지를 약 2분간</text>
+        <text class="node-time" x="730" y="616" text-anchor="middle">표시한 뒤 대기 모드로 돌아갑니다</text>
+        <text class="node-time" x="730" y="650" text-anchor="middle" fill="var(--sub)">(공통 처리 절차 자세히 보기:</text>
+        <text class="node-time" x="730" y="668" text-anchor="middle" fill="var(--sub)">전체 흐름도 참고)</text>
+      </g>
+    </svg>
+  </div>
+
+  <h2 class="section-title">🔎 단계별 자세히 보기</h2>
+
+  <div class="flow">
+    <div class="step">
+      <div class="step-head"><div class="num">1</div><div class="title">🧮 과다 유입 확인 (약 5초)</div></div>
+      <p class="desc">샘플이 감지된 직후의 대조선 밝기를 기준으로, 5초 뒤 대조선 밝기가 너무 많이 떨어졌는지 봅니다. 짧은 시간에 크게 떨어졌다면 샘플을 너무 많이 넣은 것으로 판단합니다.</p>
+      <div class="fail-tag">⚠ 도중 스틱 빠짐 → 오류 처리</div>
+      <div class="fail-tag">⚠ 대조선 밝기가 기준 이하로 떨어짐(과다 유입) → 오류 처리</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="num">2</div><div class="title">🧮 샘플 부족 확인 (약 20초)</div></div>
+      <p class="desc">빈 스틱 기준값을 기준으로, 20초 뒤 대조선 밝기가 충분히 떨어졌는지 봅니다. 충분히 떨어지지 않았다면 샘플이 부족해서 반응이 제대로 시작되지 않은 것으로 판단합니다.</p>
+      <div class="fail-tag">⚠ 도중 스틱 빠짐 → 오류 처리</div>
+      <div class="fail-tag">⚠ 대조선 밝기가 충분히 떨어지지 않음(샘플 부족) → 오류 처리</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head"><div class="num">3</div><div class="title">⏳ 나머지 반응 시간 대기</div></div>
+      <p class="desc">앞의 두 확인(총 25초)을 포함해 샘플 감지 시점부터 총 3분이 채워질 때까지 화학 반응이 끝나기를 기다립니다.</p>
+      <div class="fail-tag">⚠ 도중 스틱 빠짐 → 오류 처리</div>
+    </div>
+
+    <div class="step success">
+      <div class="step-head"><div class="num">✓</div><div class="title">완료</div></div>
+      <p class="desc">3분이 채워지면 ⑤ 최종 측정·판독 단계로 넘어갑니다.</p>
+    </div>
+  </div>
+
+  <div class="error-box">
+    <div class="step-head"><div class="num">!</div><div class="title">🚫 이 단계에서 발생 가능한 오류</div></div>
+    <p class="desc">스틱 빠짐·불량 · 샘플 과다 유입 · 샘플 부족 — 어떤 원인이든 처리 방식은 동일합니다: 원인 기록 → 오류 메시지 약 2분 표시 → 대기 모드로 복귀. (공통 절차의 자세한 설명은 전체 흐름도 문서 참고)</p>
+  </div>
+
+  <footer>
+    Surearly Multi / MFx_New_Ver — ④ 샘플량 확인·반응 대기 세부 흐름도. 관련 함수: <code>DM_App_Main_Sq_Over_Sample_Check_Step_Handler()</code>, <code>DM_App_Main_Sq_Low_Sample_Check_Step_Handler()</code>, <code>DM_App_Main_Sq_Reaction_Wait_Step_Handler()</code>.
+  </footer>
+
+</div>
+</body>
+</html>

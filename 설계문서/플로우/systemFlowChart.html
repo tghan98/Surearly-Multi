@@ -1,0 +1,360 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>전체 시스템 흐름도 - Surearly Multi</title>
+<style>
+  :root{
+    --bg:#f5f7fa;
+    --card-bg:#ffffff;
+    --card-border:#d7dee6;
+    --text:#1c2530;
+    --sub:#5b6b7a;
+    --accent:#2f6fed;
+    --accent-bg:#eaf1ff;
+    --error:#d3402f;
+    --error-bg:#fdecea;
+    --idle:#6a4bd6;
+    --idle-bg:#efe9fb;
+    --success:#1f9d55;
+    --success-bg:#e7f8ee;
+    --teal:#0f8a8a;
+    --arrow:#9aa7b4;
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#12161c;
+      --card-bg:#1b212a;
+      --card-border:#2c3543;
+      --text:#e7ecf2;
+      --sub:#9fb0c0;
+      --accent:#6fa3ff;
+      --accent-bg:#1c2c4a;
+      --error:#ff6b5a;
+      --error-bg:#3a1f1c;
+      --idle:#b79bff;
+      --idle-bg:#2a2140;
+      --success:#4ddb8c;
+      --success-bg:#123a26;
+      --teal:#4fd6d6;
+      --arrow:#586576;
+    }
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--text);
+    font-family:"Segoe UI","Malgun Gothic","Apple SD Gothic Neo",sans-serif;
+    line-height:1.55;
+  }
+  .wrap{
+    max-width:980px;
+    margin:0 auto;
+    padding:32px 20px 80px;
+  }
+  header{
+    text-align:center;
+    margin-bottom:24px;
+  }
+  header h1{ font-size:1.5rem; margin:0 0 6px; }
+  header p{ color:var(--sub); margin:0; font-size:0.95rem; }
+
+  .legend{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:10px 18px;
+    margin:0 0 24px;
+    padding:14px 16px;
+    background:var(--card-bg);
+    border:1px solid var(--card-border);
+    border-radius:12px;
+    font-size:0.85rem;
+    color:var(--sub);
+  }
+  .legend span{ display:flex; align-items:center; gap:6px; white-space:nowrap; }
+  .dot{ width:12px; height:12px; border-radius:50%; display:inline-block; flex:none; }
+  .line-sample{ width:22px; height:0; border-top:3px solid; display:inline-block; }
+  .line-dashed{ border-top-style:dashed; }
+
+  /* ---- Diagram ---- */
+  .diagram-scroll{
+    overflow-x:auto;
+    background:var(--card-bg);
+    border:1px solid var(--card-border);
+    border-radius:16px;
+    padding:16px;
+    margin-bottom:34px;
+  }
+  .diagram-scroll svg{ display:block; margin:0 auto; }
+
+  .node-title{ font-size:16px; font-weight:700; fill:var(--text); }
+  .node-time{ font-size:12px; fill:var(--sub); }
+  .edge-label{ font-size:12px; fill:var(--sub); }
+  .edge-label-strong{ font-size:12px; fill:var(--error); font-weight:600; }
+  .caption{ font-size:13px; font-weight:700; }
+
+  /* ---- Detail cards ---- */
+  h2.section-title{ font-size:1.1rem; margin:38px 0 14px; }
+  .flow{ display:flex; flex-direction:column; gap:14px; }
+  .step{
+    background:var(--card-bg);
+    border:1px solid var(--card-border);
+    border-left:6px solid var(--accent);
+    border-radius:14px;
+    padding:14px 18px;
+  }
+  .step.idle{ border-left-color:var(--idle); }
+  .step.success{ border-left-color:var(--success); }
+  .step-head{ display:flex; align-items:center; gap:10px; margin-bottom:4px; }
+  .num{
+    flex:none; width:26px; height:26px; border-radius:50%;
+    background:var(--accent-bg); color:var(--accent);
+    font-weight:700; font-size:0.8rem;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .step.idle .num{ background:var(--idle-bg); color:var(--idle); }
+  .step.success .num{ background:var(--success-bg); color:var(--success); }
+  .title{ font-weight:700; font-size:1rem; }
+  .time{
+    margin-left:auto; font-size:0.75rem; color:var(--sub);
+    background:var(--bg); border:1px solid var(--card-border);
+    padding:2px 8px; border-radius:999px; white-space:nowrap;
+  }
+  .desc{ color:var(--sub); font-size:0.9rem; margin:6px 0 0; }
+  .fail-tag{
+    margin-top:8px; display:inline-flex; align-items:center; gap:6px;
+    background:var(--error-bg); color:var(--error);
+    border:1px dashed var(--error); border-radius:8px;
+    padding:4px 9px; font-size:0.78rem;
+  }
+  .quiet-tag{
+    margin-top:8px; display:inline-flex; align-items:center; gap:6px;
+    background:var(--accent-bg); color:var(--accent);
+    border:1px dashed var(--accent); border-radius:8px;
+    padding:4px 9px; font-size:0.78rem;
+  }
+
+  .error-box{
+    margin:14px 0 10px; background:var(--error-bg);
+    border:1px solid var(--error); border-radius:14px; padding:14px 18px;
+  }
+  .error-box .num{ background:var(--error); color:#fff; }
+  .error-box .title{ color:var(--error); }
+  .error-box .desc{ color:var(--text); opacity:0.85; }
+  .loop-back{ text-align:center; color:var(--idle); font-size:0.83rem; margin-top:4px; font-weight:600; }
+
+  footer{ text-align:center; color:var(--sub); font-size:0.78rem; margin-top:36px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>🩺 전체 시스템 동작 흐름도</h1>
+    <p>Surearly Multi 진단기 — 전원을 넣은 후부터 결과가 나올 때까지의 큰 그림입니다.<br>
+       각 단계의 세부 동작(내부 판정 기준 등)은 별도 문서에서 다룹니다.</p>
+  </header>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--idle)"></span>대기/절전 상태</span>
+    <span><span class="dot" style="background:var(--accent)"></span>정상 진행 단계</span>
+    <span><span class="dot" style="background:var(--success)"></span>결과 출력</span>
+    <span><span class="dot" style="background:var(--error)"></span>오류(문제 발생) 처리</span>
+    <span><span class="line-sample" style="border-color:var(--idle)"></span>정상 완료 후 복귀</span>
+    <span><span class="line-sample line-dashed" style="border-color:var(--teal)"></span>시간 초과(오류 아님)</span>
+    <span><span class="line-sample line-dashed" style="border-color:var(--error)"></span>오류 발생 경로</span>
+  </div>
+
+  <div class="diagram-scroll">
+    <svg width="900" height="1000" viewBox="0 0 900 1000" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="ahBlue" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--accent)"/>
+        </marker>
+        <marker id="ahPurple" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--idle)"/>
+        </marker>
+        <marker id="ahTeal" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--teal)"/>
+        </marker>
+        <marker id="ahRed" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto">
+          <path d="M0,0 L10,5 L0,10 z" fill="var(--error)"/>
+        </marker>
+      </defs>
+
+      <!-- ============ main flow arrows ============ -->
+      <path d="M230,180 L230,250" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <text class="edge-label" x="240" y="220" text-anchor="start">스틱 삽입</text>
+
+      <path d="M230,330 L230,400" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+
+      <path d="M230,480 L230,550" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <text class="edge-label" x="240" y="520" text-anchor="start">샘플 감지됨</text>
+
+      <path d="M230,640 L230,710" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <text class="edge-label" x="240" y="680" text-anchor="start">반응 완료</text>
+
+      <path d="M230,790 L230,860" stroke="var(--accent)" stroke-width="3" fill="none" marker-end="url(#ahBlue)"/>
+      <text class="edge-label" x="240" y="830" text-anchor="start">판독 성공</text>
+
+      <!-- ============ normal completion loop: N6 -> N1 (left margin) ============ -->
+      <path d="M60,900 L25,900 L25,150 L60,150" stroke="var(--idle)" stroke-width="3" fill="none" marker-end="url(#ahPurple)"/>
+      <text class="edge-label" x="10" y="525" text-anchor="middle" transform="rotate(-90 10 525)">대기 모드로 복귀</text>
+
+      <!-- ============ timeout loop: N3 -> N1 (left margin, closer) ============ -->
+      <path d="M60,440 L45,440 L45,130 L60,130" stroke="var(--teal)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahTeal)"/>
+      <text class="edge-label" x="120" y="415" text-anchor="middle" fill="var(--teal)">5분 초과 → 오류 없이 복귀</text>
+
+      <!-- ============ error branch lines: N2, N4, N5 -> EBox ============ -->
+      <path d="M400,290 L600,290" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="410" y="280">사용횟수 초과 / 스틱 불량·빠짐</text>
+
+      <path d="M400,595 L600,595" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="410" y="585">샘플 과다·부족 / 스틱 빠짐</text>
+
+      <path d="M400,750 L600,750" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="410" y="775">대조선 이상(무효 판정)</text>
+
+      <!-- ============ error box return loop: EBox -> N1 (top margin) ============ -->
+      <path d="M690,250 L690,40 L400,40 L400,140" stroke="var(--error)" stroke-width="3" stroke-dasharray="6 5" fill="none" marker-end="url(#ahRed)"/>
+      <text class="edge-label-strong" x="545" y="30" text-anchor="middle">오류 표시 후 대기 모드로 복귀</text>
+
+      <!-- ============ nodes: main flow ============ -->
+      <g>
+        <rect x="60" y="100" width="340" height="80" rx="14" fill="var(--idle-bg)" stroke="var(--idle)" stroke-width="2"/>
+        <text class="node-title" x="230" y="135" text-anchor="middle">😴 대기 모드 (절전)</text>
+        <text class="node-time" x="230" y="157" text-anchor="middle">시간 제한 없음 · 스틱 삽입 시 깨어남</text>
+      </g>
+
+      <g>
+        <rect x="60" y="250" width="340" height="80" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="285" text-anchor="middle">🔍 스틱 확인 · 초기 점검</text>
+        <text class="node-time" x="230" y="307" text-anchor="middle">약 몇 초 · 사용횟수/스틱상태/센서보정</text>
+      </g>
+
+      <g>
+        <rect x="60" y="400" width="340" height="80" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="435" text-anchor="middle">💧 샘플(소변) 투입 대기</text>
+        <text class="node-time" x="230" y="457" text-anchor="middle">최대 5분</text>
+      </g>
+
+      <g>
+        <rect x="60" y="550" width="340" height="90" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="585" text-anchor="middle">⚗️ 샘플량 확인 · 반응 대기</text>
+        <text class="node-time" x="230" y="607" text-anchor="middle">총 3분 (과다/부족 확인 포함)</text>
+      </g>
+
+      <g>
+        <rect x="60" y="710" width="340" height="80" rx="14" fill="var(--accent-bg)" stroke="var(--accent)" stroke-width="2"/>
+        <text class="node-title" x="230" y="745" text-anchor="middle">📊 최종 측정 · 판독</text>
+        <text class="node-time" x="230" y="767" text-anchor="middle">약 몇 초 · 시험선/대조선 밝기 비교</text>
+      </g>
+
+      <g>
+        <rect x="60" y="860" width="340" height="80" rx="14" fill="var(--success-bg)" stroke="var(--success)" stroke-width="2"/>
+        <text class="node-title" x="230" y="895" text-anchor="middle">✅ 결과 표시</text>
+        <text class="node-time" x="230" y="917" text-anchor="middle">약 5분간 표시 후 대기 모드로</text>
+      </g>
+
+      <!-- ============ error node ============ -->
+      <g>
+        <rect x="600" y="250" width="220" height="540" rx="16" fill="var(--error-bg)" stroke="var(--error)" stroke-width="2"/>
+        <text class="node-title" x="710" y="380" text-anchor="middle" fill="var(--error)">🚫 오류 처리</text>
+        <text class="node-time" x="710" y="405" text-anchor="middle">① 원인 기록(EEPROM)</text>
+        <text class="node-time" x="710" y="425" text-anchor="middle">② 오류 화면 표시 (약 2분)</text>
+        <text class="node-time" x="710" y="445" text-anchor="middle">③ 대기 모드로 복귀</text>
+        <text class="node-time" x="710" y="475" text-anchor="middle" fill="var(--sub)">(어느 단계에서 발생했든</text>
+        <text class="node-time" x="710" y="493" text-anchor="middle" fill="var(--sub)">처리 방식은 동일합니다)</text>
+      </g>
+    </svg>
+  </div>
+
+  <h2 class="section-title">🔎 단계별 자세히 보기</h2>
+
+  <div class="flow">
+
+    <div class="step idle">
+      <div class="step-head">
+        <div class="num">1</div>
+        <div class="title">😴 대기 모드 (절전)</div>
+        <div class="time">시간 제한 없음</div>
+      </div>
+      <p class="desc">평소에는 배터리를 아끼기 위해 이 상태로 계속 잠들어 있습니다. 스틱이 꽂히는 순간에만 깨어납니다.</p>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="num">2</div>
+        <div class="title">🔍 스틱 확인 &amp; 초기 점검</div>
+        <div class="time">몇 초</div>
+      </div>
+      <p class="desc">깨어나서 스틱이 실제로 꽂혔는지 다시 한번 확인하고, 사용 횟수·스틱 상태·센서 밝기를 점검/보정합니다.</p>
+      <div class="fail-tag">⚠ 사용 횟수 초과 / 스틱 불량 / 스틱 빠짐 → 오류 처리로</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="num">3</div>
+        <div class="title">💧 샘플(소변) 투입 대기</div>
+        <div class="time">최대 5분</div>
+      </div>
+      <p class="desc">스틱에 샘플이 투입되는 것을 계속 지켜봅니다. 샘플이 감지되면 바로 다음 단계로 넘어갑니다.</p>
+      <div class="quiet-tag">⏱ 5분 안에 샘플이 감지되지 않으면, 오류 표시 없이 조용히 대기 모드로 돌아갑니다</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="num">4</div>
+        <div class="title">⚗️ 샘플량 확인 &amp; 반응 대기</div>
+        <div class="time">총 3분</div>
+      </div>
+      <p class="desc">투입 직후 샘플이 너무 많거나(과다) 너무 적지(부족) 않은지 먼저 확인한 뒤, 남은 시간 동안 화학 반응이 끝나기를 기다립니다.</p>
+      <div class="fail-tag">⚠ 샘플 과다 / 샘플 부족 / 중간에 스틱 빠짐 → 오류 처리로</div>
+    </div>
+
+    <div class="step">
+      <div class="step-head">
+        <div class="num">5</div>
+        <div class="title">📊 최종 측정 &amp; 판독</div>
+        <div class="time">몇 초</div>
+      </div>
+      <p class="desc">시험선과 대조선의 밝기를 측정해 양성/음성을 판정합니다. 대조선이 제대로 나오지 않으면 검사 자체가 무효로 처리됩니다.</p>
+      <div class="fail-tag">⚠ 대조선(정상 판정 기준선) 이상 → 오류 처리로</div>
+    </div>
+
+    <div class="step success">
+      <div class="step-head">
+        <div class="num">6</div>
+        <div class="title">✅ 결과 표시</div>
+        <div class="time">약 5분간 표시</div>
+      </div>
+      <p class="desc">양성(YES)/음성(NO) 결과를 화면에 보여주고, 측정값을 기기 내부(EEPROM)에 기록한 뒤 다시 대기 모드로 돌아갑니다.</p>
+    </div>
+
+  </div>
+
+  <div class="error-box">
+    <div class="step-head">
+      <div class="num">!</div>
+      <div class="title">🚫 오류(문제) 처리 — 공통</div>
+      <div class="time">약 2분간 표시</div>
+    </div>
+    <p class="desc">
+      2~5번 중 어느 단계에서 문제가 생기든 처리 방식은 동일합니다.<br>
+      ① 무엇이 잘못됐는지 기기 내부(EEPROM)에 기록 →
+      ② 화면에 오류 메시지 표시(약 2분) →
+      ③ 대기 모드로 복귀
+    </p>
+    <div class="loop-back">↩ 처리가 끝나면 1번 "대기 모드"로 돌아갑니다</div>
+  </div>
+
+  <footer>
+    Surearly Multi / MFx_New_Ver — 전체 흐름 요약본 (비전공자용). 각 단계의 세부 판정 로직은 별도 문서 참고.
+  </footer>
+
+</div>
+</body>
+</html>

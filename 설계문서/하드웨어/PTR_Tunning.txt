@@ -1,0 +1,6 @@
+PTR 3개 LED 2개로
+T Band, T Band Blank, C Band Blank, C Band를 측정 할 건데
+전개 전에(멘브레인이 젖기 전) 값으로 0점을 맞추고  전개 후(멘브레인이 젖고,  Band가 생성됨) 값을 측정할 건데
+PTR 값의 반사광의 반응률? 기울기? 가 다를 것 같은데 어떻게 생각하지?
+
+uint16_t T_corrected = (uint16_t)((uint32_t) Ratio_Tblank * 1000 / Ratio_Tband);
