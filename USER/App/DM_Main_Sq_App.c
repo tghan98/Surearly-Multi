@@ -178,15 +178,14 @@ static void DM_App_Main_Sq_Idle_Step_Handler(void)
     /* 5. Restore Stick Check Pin to standard Input (Disable Interrupt) */
     DM_HW_Drv_STP_CK_Set_GPIO_Input();
     
-    /* 6. TIM4 is kept DISABLED here as requested. 
-          Tick updates will be driven by DM_HW_Drv_SystemSleep_10ms(). */
-    
-    /* 7. Let ADC/clock settle for one tick after Power_Resume, then take a
-       fresh stick-presence reading. Uses DM_App_Optic_Check_StickPresent()
-       directly (not DM_App_Stick_Get_Status()), since that function's cache
-       could still hold a stale pre-Halt value at this point. */
+    /* 6. Let ADC/clock settle for one tick after Power_Resume. */
     DM_HW_Drv_SystemSleep_10ms();
 
+#if _DEBUG_LCD_SEQ_ONLY
+    /* LCD-only test: skip optical presence gating after the mechanical wakeup. */
+    DM_App_LCD_Sq_Set_Step(LCD_SQ_STICK_INSERT);
+    DM_App_Main_Sq_Set_Step(MAIN_SQ_STICK_INSERT);
+#else
     if (DM_App_Optic_Check_StickPresent())
     {
         /* Transition to Stick Insert Step */
@@ -200,6 +199,7 @@ static void DM_App_Main_Sq_Idle_Step_Handler(void)
            handler and goes back to Halt mode. */
         DM_App_Main_Sq_Set_Step(MAIN_SQ_IDLE);
     }
+#endif
 }
 
 /**

@@ -67,7 +67,7 @@ int32_t User_Main_Init(void)
     /* Initialize Hardware */
     DM_HW_Drv_SystemClock_Init();
     DM_HW_Drv_GPIO_Init();
-    
+
     /* Initialize Peripherals */
     DM_HW_Drv_SystemTick_TIM4_Init();
     DM_HW_Drv_ADC_Init();

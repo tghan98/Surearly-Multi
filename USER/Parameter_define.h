@@ -52,7 +52,7 @@
 // Debug
 // 1: Skip real measurement/EEPROM work in DM_Main_Sq_App step handlers and just
 //    delay-then-advance, so only the LCD sequence animations can be checked.
-#define _DEBUG_LCD_SEQ_ONLY             0
+#define _DEBUG_LCD_SEQ_ONLY             1
 #define _DEBUG_SEQ_STEP_DELAY           500     // 10ms units (500 = 5 sec)
 //------------------------------------------------------------------------------
 
