@@ -37,10 +37,10 @@ static const ADC_Channel_TypeDef gs_tOptic_ADC[OPTIC_CH_MAX] = {
 };
 
 /**
- * @brief PWM Duty Cycle for each Optical Channel (Configurable)
+ * @brief On-time (us) per Optical Channel (set by tuning; Stage 1 = fixed default)
  */
-static uint16_t gs_wOptic_PWM[OPTIC_CH_MAX] = {
-    199, 199, 199, 199
+static uint16_t gs_wOptic_OnTime[OPTIC_CH_MAX] = {
+    OPTIC_ONTIME_DEFAULT, OPTIC_ONTIME_DEFAULT, OPTIC_ONTIME_DEFAULT, OPTIC_ONTIME_DEFAULT
 };
 
 /* Functions -----------------------------------------------------------------*/
@@ -48,10 +48,10 @@ static uint16_t gs_wOptic_PWM[OPTIC_CH_MAX] = {
 /**
   * @brief  Measures ADC value for a specific optical channel set.
   * @param  tCh: Optical channel selection.
-  * @param  wPWM: PWM duty cycle.
-  * @retval uint16_t: Filtered ADC measurement result.
+  * @param  wOnTime_us: LED on-time before the ADC burst (us).
+  * @retval uint16_t: Filtered ADC measurement result (sum of middle 14 samples).
   */
-uint16_t  DM_App_Optic_Measure(OPTIC_CH_t tCh, uint16_t wPWM)
+uint16_t  DM_App_Optic_Measure(OPTIC_CH_t tCh, uint16_t wOnTime_us)
 {
     uint16_t awSamples[20];
     uint32_t dwSum = 0;
@@ -63,53 +63,31 @@ uint16_t  DM_App_Optic_Measure(OPTIC_CH_t tCh, uint16_t wPWM)
         return 0;
     }
 
-    /* 1. Turn ON PTR Power */
-    DM_HW_Drv_PTR_Power_On();
-
-    /* 2. Setup PWM Duty from parameter */
-    DM_HW_Drv_LED_Duty_Set(wPWM);
-
-    /* 3. Turn ON the mapped LED (Mutual exclusion handled in Drv) */
-    DM_HW_Drv_LED_Control(gs_tOptic_LED[tCh], ENABLE);
-
-    /* 4. Start PWM Output */
-    DM_HW_Drv_LED_PWM_Start();
-
-    /* 5. Select the ADC channel once for the whole burst (not per-sample) -
-       halves conversion count vs. re-selecting on every sample, since the
-       sort/trim below (discards 3 lowest + 3 highest) already absorbs a
-       first-sample channel-switch settling artifact if one occurs. */
+    /* 1. Select the ADC channel once for the whole burst */
     DM_HW_Drv_ADC_ChannelSelect(gs_tOptic_ADC[tCh]);
 
-    /* 6. Wait once for LED/input-filter stabilization (100K + 22nF ADC input
-       filter, ~2.2ms time constant - 10ms covers ~4.5 tau). The LED and
-       filter stay settled for the rest of the burst, so later samples don't
-       need to repeat this wait. */
-    DM_HW_Drv_SystemSleep_10ms();
+    /* 2. Turn ON the mapped LED (mutual exclusion handled in Drv) */
+    DM_HW_Drv_LED_Control(gs_tOptic_LED[tCh], ENABLE);
 
-    /* 7. Burst-read 20 samples back-to-back (~200us each per ADC_READ_TIME_US) */
-    /* Total measurement time: ~10ms settle + ~4ms burst + 10ms recovery (below) */
+    /* 3. On-time: place the sample point on the PTR RC charging transient.
+       Replaces the former fixed 10ms settle; the LED stays on through the
+       burst below (kept short by the 16-cycle ADC so on-time dominates). */
+    DM_HW_Drv_Delay_us(wOnTime_us);
+
+    /* 4. Burst-read 20 samples back-to-back */
     for (i = 0; i < 20; i++)
     {
         awSamples[i] = DM_HW_Drv_ADC_Read();
     }
 
-    /* 8. Deselect the ADC channel */
+    /* 5. Turn OFF LED and deselect the ADC channel */
+    DM_HW_Drv_LED_Control(gs_tOptic_LED[tCh], DISABLE);
     DM_HW_Drv_ADC_ChannelDeselect(gs_tOptic_ADC[tCh]);
 
-    /* 9. Stop PWM and Turn OFF LED */
-    DM_HW_Drv_LED_Stop();
-    DM_HW_Drv_LED_Control(gs_tOptic_LED[tCh], DISABLE);
-
-    /* 10. Turn OFF PTR Power */
-    DM_HW_Drv_PTR_Power_Off();
-
-    /* 11. Recovery wait: LED load is now off, let the 10uF supply capacitor
-       recharge from the battery before the next measurement burst starts
-       (one 10ms timer tick, per battery internal-resistance recovery time). */
+    /* 6. Recovery wait: let the supply cap recharge before the next burst */
     DM_HW_Drv_SystemSleep_10ms();
 
-    /* 12. Sort samples (Bubble Sort) */
+    /* 7. Sort samples (Bubble Sort) */
     for (i = 0; i < 19; i++)
     {
         for (j = i + 1; j < 20; j++)
@@ -123,14 +101,12 @@ uint16_t  DM_App_Optic_Measure(OPTIC_CH_t tCh, uint16_t wPWM)
         }
     }
 
-    /* 13. Sum the middle 14 values (Index 3 to 16) */
+    /* 8. Sum the middle 14 values (Index 3 to 16) */
     for (i = 3; i <= 16; i++)
     {
         dwSum += awSamples[i];
     }
 
-    /* 14. Return average */
-    //return (uint16_t)(dwSum / 6);
     return (uint16_t)(dwSum);
 }
 
@@ -139,11 +115,11 @@ uint16_t  DM_App_Optic_Measure(OPTIC_CH_t tCh, uint16_t wPWM)
   * @param  tCh: Optical channel selection.
   * @retval uint16_t: Current PWM duty cycle.
   */
-uint16_t DM_App_Optic_GetPWM(OPTIC_CH_t tCh)
+uint16_t DM_App_Optic_GetOnTime(OPTIC_CH_t tCh)
 {
     if (tCh < OPTIC_CH_MAX)
     {
-        return gs_wOptic_PWM[tCh];
+        return gs_wOptic_OnTime[tCh];
     }
     return 0;
 }
@@ -156,13 +132,13 @@ uint16_t DM_App_Optic_GetPWM(OPTIC_CH_t tCh)
   * @param  None
   * @retval None
   */
-void DM_App_Optic_ResetPWM(void)
+void DM_App_Optic_ResetOnTime(void)
 {
     static uint8_t i;
 
     for (i = 0; i < (uint8_t)OPTIC_CH_MAX; i++)
     {
-        gs_wOptic_PWM[i] = 0;
+        gs_wOptic_OnTime[i] = 0;
     }
 }
 
@@ -306,8 +282,8 @@ uint8_t DM_App_Optic_TuneTargetADC(uint16_t* pInitBuffer, uint16_t wTargetADC)
             }
         }
 
-        /* Store the final tuned PWM value */
-        gs_wOptic_PWM[bCh] = (uint16_t)wCurrentPWM;
+        /* Store the final tuned on-time value */
+        gs_wOptic_OnTime[bCh] = (uint16_t)wCurrentPWM;
     }
 
     return OPTIC_SUCCESS;
@@ -331,8 +307,8 @@ uint8_t DM_App_Optic_MeasureEmptyPTR(uint16_t* pBuffer)
             return OPTIC_ERR_STICK_REMOVED;
         }
 
-        /* Measure using the currently tuned PWM for each channel */
-        pBuffer[bCh] = DM_App_Optic_Measure((OPTIC_CH_t)bCh, gs_wOptic_PWM[bCh]);
+        /* Measure using the currently tuned on-time for each channel */
+        pBuffer[bCh] = DM_App_Optic_Measure((OPTIC_CH_t)bCh, gs_wOptic_OnTime[bCh]);
     }
 
     return OPTIC_SUCCESS;
@@ -347,7 +323,7 @@ uint8_t DM_App_Optic_MeasureEmptyPTR(uint16_t* pBuffer)
   */
 uint8_t DM_App_Optic_Check_StickPresent(void)
 {
-    uint16_t wADC = DM_App_Optic_Measure(OPTIC_CH_3, 399);
+    uint16_t wADC = DM_App_Optic_Measure(OPTIC_CH_3, OPTIC_ONTIME_MAX);
 
     return (wADC < OPTIC_STICK_REMOVE_THRESHOLD) ? 0 : 1;
 }
@@ -355,17 +331,10 @@ uint8_t DM_App_Optic_Check_StickPresent(void)
 //LED test
 void LED_ON_Test(void)
 {
-    /* 1. Setup PWM Duty from parameter */
-    DM_HW_Drv_LED_Duty_Set(399);
-
-    /* 2. Turn ON the mapped LED (Mutual exclusion handled in Drv) */
+    /* Turn ON the mapped LED (v1.1: cathode Low = ON) */
     DM_HW_Drv_LED_Control(gs_tOptic_LED[0], ENABLE);
 
-    /* 3. Start PWM Output */
-    DM_HW_Drv_LED_PWM_Start();
-    
     DM_HW_Drv_SystemSleep_10ms();
-
 }
 
 

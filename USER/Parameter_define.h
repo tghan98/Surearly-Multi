@@ -31,6 +31,15 @@
 #define OPTIC_INITIAL_MIN_100           1800    /**< Min acceptable ADC @ Duty 100% (PWM399) */
 #define OPTIC_INITIAL_MAX_100           4200    /**< Max acceptable ADC @ Duty 100% (PWM399) */
 
+/* On-time (us) for LED measurement (v1.1 board - replaces PWM duty control).
+   Stage 1 uses a fixed default; X1/X2/MAX are placeholders to be finalized from
+   the Stage 2 on-time sweep. Choose X1 < target on-time < X2 to bracket the
+   target (avoid extrapolation on the RC charging curve). */
+#define OPTIC_ONTIME_DEFAULT            800     /**< Fixed on-time for Stage 1 bring-up */
+#define OPTIC_ONTIME_MAX                1500    /**< Max on-time (stick-present check) - placeholder */
+#define OPTIC_ONTIME_X1                 500     /**< 2-point interpolation low point - placeholder */
+#define OPTIC_ONTIME_X2                 1000    /**< 2-point interpolation high point - placeholder */
+
 #define _nSCAN_MAX_CNT                  30      // Max allowed device usage/scan count
 
 #define _nEMPTY_BTB_RATIO               90

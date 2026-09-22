@@ -226,7 +226,7 @@ static void DM_App_Main_Sq_Stick_Insert_Step_Handler(void)
 
     /* 0. Reset stale measurement/result data from the previous cycle so an
        early failure below doesn't save leftover data from a prior test to ROM. */
-    DM_App_Optic_ResetPWM();
+    DM_App_Optic_ResetOnTime();
     for (i = 0; i < BAND_MAX; i++)
     {
         gs_awEmptyBand_LowData[i]  = 0;
@@ -378,9 +378,9 @@ static void DM_App_Main_Sq_Sample_Load_Wait_Step_Handler(void)
        which would otherwise inflate this 5-minute wait well past 5 minutes. */
     dwStartTick = GetSystemTick();
 
-    /* 3. Get current PWM for measurements */
-    wPWM_T = DM_App_Optic_GetPWM(OPTIC_CH_0);
-    wPWM_BT = DM_App_Optic_GetPWM(OPTIC_CH_1);
+    /* 3. Get current on-time for measurements */
+    wPWM_T = DM_App_Optic_GetOnTime(OPTIC_CH_0);
+    wPWM_BT = DM_App_Optic_GetOnTime(OPTIC_CH_1);
 
     /* 4. Monitoring Loop: up to SAMPLE_LOAD_WAIT_TIME x 10ms (5 minutes) of real elapsed time */
     while ((GetSystemTick() - dwStartTick) < SAMPLE_LOAD_WAIT_TIME)
@@ -411,8 +411,8 @@ static void DM_App_Main_Sq_Sample_Load_Wait_Step_Handler(void)
             gs_awResultBand_LowData[BAND_BT] = wMeasured_BT;
 
             /* Measure and store BC (OPTIC_CH_2) and C (OPTIC_CH_3) */
-            gs_awResultBand_LowData[BAND_BC] = DM_App_Optic_Measure(OPTIC_CH_2, DM_App_Optic_GetPWM(OPTIC_CH_2));
-            gs_awResultBand_LowData[BAND_C] = DM_App_Optic_Measure(OPTIC_CH_3, DM_App_Optic_GetPWM(OPTIC_CH_3));
+            gs_awResultBand_LowData[BAND_BC] = DM_App_Optic_Measure(OPTIC_CH_2, DM_App_Optic_GetOnTime(OPTIC_CH_2));
+            gs_awResultBand_LowData[BAND_C] = DM_App_Optic_Measure(OPTIC_CH_3, DM_App_Optic_GetOnTime(OPTIC_CH_3));
 
             /* Transition to Next Step */
             DM_App_Main_Sq_Set_Step(MAIN_SQ_OVER_SAMPLE_CHECK);
@@ -483,7 +483,7 @@ static void DM_App_Main_Sq_Over_Sample_Check_Step_Handler(void)
     }
 
     /* 3. Measure Current C value (OPTIC_CH_3) */
-    wMeasured_C = DM_App_Optic_Measure(OPTIC_CH_3, DM_App_Optic_GetPWM(OPTIC_CH_3));
+    wMeasured_C = DM_App_Optic_Measure(OPTIC_CH_3, DM_App_Optic_GetOnTime(OPTIC_CH_3));
 
     /* 4. Comparison Logic */
     /* If Current_C is larger than Threshold (Dropped less than 92%) */
@@ -537,7 +537,7 @@ static void DM_App_Main_Sq_Low_Sample_Check_Step_Handler(void)
     }
 
     /* 3. Measure Current C value (OPTIC_CH_3) */
-    wMeasured_C = DM_App_Optic_Measure(OPTIC_CH_3, DM_App_Optic_GetPWM(OPTIC_CH_3));
+    wMeasured_C = DM_App_Optic_Measure(OPTIC_CH_3, DM_App_Optic_GetOnTime(OPTIC_CH_3));
 
     /* 4. Comparison Logic */
     /* If Current_C is smaller than Threshold (C value dropped enough) */
@@ -621,10 +621,10 @@ static void DM_App_Main_Sq_Result_Scan_Step_Handler(void)
 
     /* 1. Final measurement from C to T band (Reverse order) */
     /* Store raw ADC values in gs_awResultBand_LowData */
-    gs_awResultBand_LowData[BAND_C]  = DM_App_Optic_Measure(OPTIC_CH_3, DM_App_Optic_GetPWM(OPTIC_CH_3));
-    gs_awResultBand_LowData[BAND_BC] = DM_App_Optic_Measure(OPTIC_CH_2, DM_App_Optic_GetPWM(OPTIC_CH_2));
-    gs_awResultBand_LowData[BAND_BT] = DM_App_Optic_Measure(OPTIC_CH_1, DM_App_Optic_GetPWM(OPTIC_CH_1));
-    gs_awResultBand_LowData[BAND_T]  = DM_App_Optic_Measure(OPTIC_CH_0, DM_App_Optic_GetPWM(OPTIC_CH_0));
+    gs_awResultBand_LowData[BAND_C]  = DM_App_Optic_Measure(OPTIC_CH_3, DM_App_Optic_GetOnTime(OPTIC_CH_3));
+    gs_awResultBand_LowData[BAND_BC] = DM_App_Optic_Measure(OPTIC_CH_2, DM_App_Optic_GetOnTime(OPTIC_CH_2));
+    gs_awResultBand_LowData[BAND_BT] = DM_App_Optic_Measure(OPTIC_CH_1, DM_App_Optic_GetOnTime(OPTIC_CH_1));
+    gs_awResultBand_LowData[BAND_T]  = DM_App_Optic_Measure(OPTIC_CH_0, DM_App_Optic_GetOnTime(OPTIC_CH_0));
 
     /* 2. Calculate Normalized Intensities (Normalized to Empty Values) */
     /* Final BT = (Current BT / Empty BT) * 1000 */
@@ -691,10 +691,10 @@ void DM_App_Main_Sq_Save_Result_To_Rom(uint8_t bSaveIndex)
 
     idx = 0;
 
-    /* 1. Pack Optic PWM Values (8 bytes) */
+    /* 1. Pack Optic on-time Values (8 bytes) */
     for (i = 0; i < (uint8_t)OPTIC_CH_MAX; i++)
     {
-        awRomBuffer[idx++] = DM_App_Optic_GetPWM((OPTIC_CH_t)i);
+        awRomBuffer[idx++] = DM_App_Optic_GetOnTime((OPTIC_CH_t)i);
     }
 
     /* 2. Pack gs_awEmptyBand_LowData (8 bytes) */

@@ -50,7 +50,7 @@ void DM_HW_Drv_SystemClock_Init(void)
     CLK_SYSCLKDivConfig(CLK_SYSCLKDiv_8);
     
     /* Enable peripheral clocks (essential peripherals) */
-    CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, ENABLE);   /* For LED PWM control */
+    /* TIM2 (LED PWM) removed on v1.1 board - no LED_PWM pin. */
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM4, ENABLE);   /* For 10ms system timer */
     CLK_PeripheralClockConfig(CLK_Peripheral_ADC1, ENABLE);   /* For sensor measurement */
     CLK_PeripheralClockConfig(CLK_Peripheral_USART1, ENABLE); /* For communication */
@@ -64,12 +64,9 @@ void DM_HW_Drv_SystemClock_Init(void)
 void DM_HW_Drv_GPIO_Init(void)
 {
     /* 1. LED Configuration */
-    /* LED_PWM (PB2): For TIM2_CH2 PWM output (Initially Push-Pull Low) */
-    GPIO_Init(LED_PWM_GPIO_PORT, LED_PWM_GPIO_PIN, GPIO_Mode_Out_PP_Low_Fast);
-
-    /* nLED1 (PC0), nLED2 (PC1): True Open-Drain, sink only. Default HiZ (OFF) */
-    GPIO_Init(LED1_GPIO_PORT, LED1_GPIO_PIN, GPIO_Mode_Out_OD_HiZ_Fast);
-    GPIO_Init(LED2_GPIO_PORT, LED2_GPIO_PIN, GPIO_Mode_Out_OD_HiZ_Fast);
+    /* nLED1 (PB4), nLED2 (PB3): cathode drive, Push-Pull. Init High = OFF. */
+    GPIO_Init(LED1_GPIO_PORT, LED1_GPIO_PIN, GPIO_Mode_Out_PP_High_Fast);
+    GPIO_Init(LED2_GPIO_PORT, LED2_GPIO_PIN, GPIO_Mode_Out_PP_High_Fast);
 
     /* 2. LCD Configuration (Default Low) */
     GPIO_Init(LCD_COM0_GPIO_PORT, LCD_COM0_GPIO_PIN, GPIO_Mode_Out_PP_Low_Slow);
@@ -92,9 +89,7 @@ void DM_HW_Drv_GPIO_Init(void)
     GPIO_Init(ADC_MIDL_PORT, ADC_MIDL_PIN, GPIO_Mode_In_FL_No_IT);
     GPIO_Init(ADC_REAR_PORT, ADC_REAR_PIN, GPIO_Mode_In_FL_No_IT);
 
-    /* 5. PTR Power (PB3): Output Push-Pull */
-    GPIO_Init(PTR_PW_PORT, PTR_PW_GPIO, GPIO_Mode_Out_PP_High_Slow);
-    DM_HW_Drv_PTR_Power_On();
+    /* 5. PTR Power removed on v1.1 board (PTR collector wired directly to VCC). */
 
     /* 6. Stick Check (STP_CK, PB1) */
     /* Initially set as standard input to prevent accidental wakeups during boot */
@@ -102,36 +97,9 @@ void DM_HW_Drv_GPIO_Init(void)
 }
 
 /**
-  * @brief  Initializes TIM2 for LED PWM control (5kHz).
-  * @note   System Clock = 2MHz, Target = 5kHz
-  *         ARR = (2,000,000 / 5,000) - 1 = 399
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_LED_TIM2_Init(void)
-{
-    /* Time Base configuration: Prescaler = 1, ARR = 399 (for 5kHz) */
-    TIM2_TimeBaseInit(TIM2_Prescaler_1, TIM2_CounterMode_Up, 399);
-    
-    /* PWM1 Mode configuration on Channel 2 (PB2) */
-    /* PB2 = Anode (source) side: OCPolarity_High -> CCR=0 always LOW (OFF), CCR=399 always HIGH (100% ON) */
-    TIM2_OC2Init(TIM2_OCMode_PWM1,
-                 TIM2_OutputState_Enable,
-                 0,                       /* Initial Pulse = 0 (LED Off) */
-                 TIM2_OCPolarity_High,
-                 TIM2_OCIdleState_Reset);
-    
-    /* Enable PWM main output */
-    TIM2_CtrlPWMOutputs(ENABLE);
-    
-    /* Ensure output is stopped and pin is LOW after initialization */
-    DM_HW_Drv_LED_Stop();
-}
-
-/**
   * @brief  Controls specific LED channel (LED1, LED2).
-  * @note   nLED1/nLED2 (PC0/PC1) are True Open-Drain, sink-only pins.
-  *         ENABLE turns LED ON (Low, sink), DISABLE turns LED OFF (HiZ, floating).
+  * @note   v1.1 board: nLED1/nLED2 (PB4/PB3) are the cathode drive, Push-Pull.
+  *         ENABLE turns LED ON (Low, sink), DISABLE turns LED OFF (High).
   *         Strict mutual exclusion is applied: Turning ON one LED will turn OFF the other.
   * @param  tCh: LED channel selection (CH_LED_1 or CH_LED_2).
   * @param  NewState: Target state (ENABLE or DISABLE).
@@ -144,18 +112,18 @@ void DM_HW_Drv_LED_Control(LED_CH_t tCh, FunctionalState NewState)
         /* Guard-rail: Turn OFF both first or ensure the other is OFF to maintain exclusivity */
         if (tCh == CH_LED_1)
         {
-            GPIO_SetBits(LED2_GPIO_PORT, LED2_GPIO_PIN);    /* Ensure LED2 is OFF (HiZ) */
+            GPIO_SetBits(LED2_GPIO_PORT, LED2_GPIO_PIN);    /* Ensure LED2 is OFF (High) */
             GPIO_ResetBits(LED1_GPIO_PORT, LED1_GPIO_PIN);  /* Turn ON LED1 (Low, sink) */
         }
         else if (tCh == CH_LED_2)
         {
-            GPIO_SetBits(LED1_GPIO_PORT, LED1_GPIO_PIN);    /* Ensure LED1 is OFF (HiZ) */
+            GPIO_SetBits(LED1_GPIO_PORT, LED1_GPIO_PIN);    /* Ensure LED1 is OFF (High) */
             GPIO_ResetBits(LED2_GPIO_PORT, LED2_GPIO_PIN);  /* Turn ON LED2 (Low, sink) */
         }
     }
     else
     {
-        /* Simply turn OFF the selected channel (HiZ, floating) */
+        /* Simply turn OFF the selected channel (High) */
         if (tCh == CH_LED_1)
         {
             GPIO_SetBits(LED1_GPIO_PORT, LED1_GPIO_PIN);
@@ -199,50 +167,34 @@ void DM_HW_Drv_SystemTick_TIM4_Init(void)
     TIM4_Cmd(DISABLE);
 }
 
+/* Inner-loop repeats per requested microsecond. PLACEHOLDER - Stage 2 must
+   re-measure on real hardware (scope an LED pin) since fMASTER=2MHz gives only
+   0.5us/cycle and the true loop cost depends on the IAR build. */
+#define DELAY_US_CAL    1
+
 /**
-  * @brief  Sets the LED PWM duty cycle.
-  * @param  wDuty_0_to_399: PWM duty cycle value (0 to 399).
+  * @brief  Blocking busy-wait for the LED on-time (approximate).
+  * @note   Interrupts are left as-is: during a measurement TIM4 is disabled
+  *         (only enabled inside DM_HW_Drv_SystemSleep_10ms()), so no LCD-refresh
+  *         tick perturbs this delay. The intended time is folded into the system
+  *         tick for the 5-minute wait accounting.
+  * @param  wMicroseconds: On-time to wait, in microseconds.
   * @retval None
   */
-void DM_HW_Drv_LED_Duty_Set(uint16_t wDuty_0_to_399)
+void DM_HW_Drv_Delay_us(uint16_t wMicroseconds)
 {
-    /* Limit the duty cycle to the maximum ARR value (399) */
-    if (wDuty_0_to_399 > 399)
+    uint16_t wUs;
+    volatile uint16_t n;
+
+    for (wUs = wMicroseconds; wUs > 0; wUs--)
     {
-        wDuty_0_to_399 = 399;
+        for (n = 0; n < DELAY_US_CAL; n++)
+        {
+            /* busy spin - calibrate DELAY_US_CAL in Stage 2 */
+        }
     }
 
-    /* Set the Capture Compare 2 Register value for TIM2 */
-    TIM2_SetCompare2(wDuty_0_to_399);
-}
-
-/**
-  * @brief  Starts the LED PWM output.
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_LED_PWM_Start(void)
-{
-    /* Enable Channel 2 output and TIM2 counter */
-    TIM2_CCxCmd(TIM2_Channel_2, ENABLE);
-    TIM2_Cmd(ENABLE);
-}
-
-/**
-  * @brief  Stops the LED PWM output and ensures the pin is LOW.
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_LED_Stop(void)
-{
-    /* Disable TIM2 counter */
-    TIM2_Cmd(DISABLE);
-    
-    /* Disable Channel 2 output to return pin control to GPIO */
-    TIM2_CCxCmd(TIM2_Channel_2, DISABLE);
-
-    /* Drive anode pin LOW to ensure LED is OFF (no source current) */
-    GPIO_WriteBit(LED_PWM_GPIO_PORT, LED_PWM_GPIO_PIN, RESET);
+    SystemTick_AddUntracked_us(wMicroseconds);
 }
 
 /**
@@ -289,9 +241,11 @@ void DM_HW_Drv_ADC_Init(void)
     /* 1. Configure ADC1: Single Conversion, 12-bit, No clock division */
     ADC_Init(ADC1, ADC_ConversionMode_Single, ADC_Resolution_12Bit, ADC_Prescaler_1);
     
-    /* 2. Configure Sampling Time for Slow Channels Group (CH0-23)
-       Max sampling time (384 cycles) to allow sufficient charge transfer. */
-    ADC_SamplingTimeConfig(ADC1, ADC_Group_SlowChannels, ADC_SamplingTime_384Cycles);
+    /* 2. Sampling time = 16 cycles (v1.1 board). The node cap (C12~C14, tens of
+       nF) supplies the S/H charge, so the 100k source does not gate sampling;
+       short sampling keeps the burst << on-time (see plan 2-1). Verify against
+       384 cycles in Stage 2. */
+    ADC_SamplingTimeConfig(ADC1, ADC_Group_SlowChannels, ADC_SamplingTime_16Cycles);
     
     /* 3. Wake up ADC from Power Down mode */
     ADC_Cmd(ADC1, ENABLE);
@@ -304,24 +258,18 @@ void DM_HW_Drv_ADC_Init(void)
   */
 void DM_HW_Drv_ADC_ChannelSelect(ADC_Channel_TypeDef ADC_Channel)
 {
-    /* Enable the specified ADC channel */
+    /* Enable the specified ADC channel (EOC is polled, not interrupt-driven) */
     ADC_ChannelCmd(ADC1, ADC_Channel, ENABLE);
-
-    /* Enable ADC End of Conversion (EOC) Interrupt for wakeup */
-    ADC_ITConfig(ADC1, ADC_IT_EOC, ENABLE);
 }
 
-/* Nominal calc: (12+384 cycles)/2MHz ~= 198us. Empirically re-measured on
-   real hardware as ~220us (back-to-back burst reads, see DM_App_Optic_Measure())
-   - includes wfi()/EOC interrupt latency the nominal cycle count doesn't
-   account for. This time is spent in a wfi() loop woken by the ADC's own EOC
-   interrupt, not DM_HW_Drv_SystemSleep_10ms(), so it is otherwise invisible
-   to GetSystemTick() - folded in explicitly below instead. */
-#define ADC_READ_TIME_US    220
+/* Sampling 16 cycles -> nominal (12+16)/2MHz ~= 14us per read. TENTATIVE: must
+   be re-measured on real hardware in Stage 4 (feeds the 5-minute wait tick
+   accounting, see GetSystemTick()). */
+#define ADC_READ_TIME_US    14
 
 /**
   * @brief  Performs a single 12-bit conversion on the currently selected channel.
-  * @note   Enters Core Sleep mode during conversion for power saving.
+  * @note   Busy-polls the EOC flag (no wfi/EOC interrupt).
   * @param  None
   * @retval 12-bit ADC conversion result.
   */
@@ -329,19 +277,15 @@ uint16_t DM_HW_Drv_ADC_Read(void)
 {
     uint16_t wADC_Result;
 
-    /* Reset conversion done flag */
-    DM_HW_Drv_ADC_ClearConvDone();
-
     /* Start Software Conversion */
     ADC_SoftwareStartConv(ADC1);
 
-    /* Enter Wait Mode (Core Sleep) until ISR sets flag. */
-    while (DM_HW_Drv_ADC_GetConvDone() == 0)
+    /* Busy-poll the EOC flag until the conversion completes */
+    while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET)
     {
-        wfi();
     }
 
-    /* Read Result */
+    /* Read Result (reading clears the EOC flag) */
     wADC_Result = ADC_GetConversionValue(ADC1);
 
     /* Account for this conversion's real elapsed time (see GetSystemTick()) */
@@ -357,8 +301,7 @@ uint16_t DM_HW_Drv_ADC_Read(void)
   */
 void DM_HW_Drv_ADC_ChannelDeselect(ADC_Channel_TypeDef ADC_Channel)
 {
-    /* Disable ADC Interrupt and the channel to save power */
-    ADC_ITConfig(ADC1, ADC_IT_EOC, DISABLE);
+    /* Disable the channel to save power */
     ADC_ChannelCmd(ADC1, ADC_Channel, DISABLE);
 }
 
@@ -419,26 +362,6 @@ void DM_HW_Drv_USART_SendWord(uint16_t wVal)
 }
 
 /**
-  * @brief  Turns ON the PTR power (PB3 High).
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_PTR_Power_On(void)
-{
-    GPIO_SetBits(PTR_PW_PORT, PTR_PW_GPIO);
-}
-
-/**
-  * @brief  Turns OFF the PTR power (PB3 Low).
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_PTR_Power_Off(void)
-{
-    GPIO_ResetBits(PTR_PW_PORT, PTR_PW_GPIO);
-}
-
-/**
   * @brief  Enters Halt mode and waits for a stick insertion (Falling edge on PB1).
   * @param  None
   * @retval None
@@ -486,31 +409,27 @@ BitStatus DM_HW_Drv_STP_CK_Get_Status(void)
   */
 void DM_HW_Drv_Power_PrepareSleep(void)
 {
-    /* 1. Ensure all LEDs are OFF (True Open-Drain: float HiZ via SetBits) */
+    /* 1. Ensure all LEDs are OFF (Push-Pull: High = OFF) */
     GPIO_SetBits(LED1_GPIO_PORT, LED1_GPIO_PIN);
     GPIO_SetBits(LED2_GPIO_PORT, LED2_GPIO_PIN);
 
-    /* 2. Stop LED PWM and drive pin LOW */
-    DM_HW_Drv_LED_Stop();
-
-    /* 3. Ensure LCD pins are LOW to avoid ghosting/leakage */
+    /* 2. Ensure LCD pins are LOW to avoid ghosting/leakage */
     GPIO_ResetBits(LCD_COM0_GPIO_PORT, LCD_COM0_GPIO_PIN);
     GPIO_ResetBits(LCD_SEG0_GPIO_PORT, LCD_SEG0_GPIO_PIN);
     GPIO_ResetBits(LCD_SEG1_GPIO_PORT, LCD_SEG1_GPIO_PIN);
     GPIO_ResetBits(LCD_SEG2_GPIO_PORT, LCD_SEG2_GPIO_PIN);
     GPIO_ResetBits(LCD_SEG3_GPIO_PORT, LCD_SEG3_GPIO_PIN);
 
-    /* 4. Disable ADC */
+    /* 3. Disable ADC */
     ADC_Cmd(ADC1, DISABLE);
     
-    /* 5. Disable USART */
+    /* 4. Disable USART */
     USART_Cmd(USART1, DISABLE);
 
-    /* 6. Enable Ultra-Low Power mode for the internal regulator during Halt */
+    /* 5. Enable Ultra-Low Power mode for the internal regulator during Halt */
     PWR_UltraLowPowerCmd(ENABLE);
     
-    /* 7. Disable all peripheral clocks to minimize consumption */
-    CLK_PeripheralClockConfig(CLK_Peripheral_TIM2, DISABLE);
+    /* 6. Disable all peripheral clocks to minimize consumption (TIM2 unused) */
     CLK_PeripheralClockConfig(CLK_Peripheral_TIM4, DISABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_ADC1, DISABLE);
     CLK_PeripheralClockConfig(CLK_Peripheral_USART1, DISABLE);

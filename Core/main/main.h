@@ -63,19 +63,20 @@ extern "C" {
 //HW IO Define 
 
 /* LED  */
+/* v1.1 board: LED anode is hard-wired to VCC via R13(510R); cathode = nLEDx on
+   MCU. Drive Push-Pull, Low = ON (sink), High = OFF. No LED_PWM pin (PB2 is now
+   LCD_COM0). */
 //GPIO
-#define LED_PWM_GPIO_PORT       GPIOB
-#define LED1_GPIO_PORT          GPIOC   /* nLED1: True Open-Drain pin (sink only) */
-#define LED2_GPIO_PORT          GPIOC   /* nLED2: True Open-Drain pin (sink only) */
+#define LED1_GPIO_PORT          GPIOB   /* nLED1 cathode (Push-Pull) */
+#define LED2_GPIO_PORT          GPIOB   /* nLED2 cathode (Push-Pull) */
 
 //Pin
-#define LED_PWM_GPIO_PIN        GPIO_Pin_2
-#define LED1_GPIO_PIN           GPIO_Pin_0
-#define LED2_GPIO_PIN           GPIO_Pin_1
+#define LED1_GPIO_PIN           GPIO_Pin_4
+#define LED2_GPIO_PIN           GPIO_Pin_3
 
 /* Custom LCD */
 //GPIO
-#define LCD_COM0_GPIO_PORT      GPIOB   /* Moved from PC0 (True OD) to PB4 (Push-Pull) for AC drive */
+#define LCD_COM0_GPIO_PORT      GPIOB   /* v1.1 board: LCD COM on PB2 (Push-Pull AC drive) */
 
 #define LCD_SEG0_GPIO_PORT	GPIOC
 #define LCD_SEG1_GPIO_PORT	GPIOC
@@ -83,7 +84,7 @@ extern "C" {
 #define LCD_SEG3_GPIO_PORT	GPIOB
 
 //Pin
-#define LCD_COM0_GPIO_PIN       GPIO_Pin_4
+#define LCD_COM0_GPIO_PIN       GPIO_Pin_2
 
 #define LCD_SEG0_GPIO_PIN	GPIO_Pin_5
 #define LCD_SEG1_GPIO_PIN	GPIO_Pin_6
@@ -127,9 +128,7 @@ extern "C" {
 #define STP_CK_PORT        GPIOB
 #define STP_CK_PIN         GPIO_Pin_1
 
-/* PTR Power */
-#define PTR_PW_PORT        GPIOB   /* Moved from PC1 (True OD) to PB3 (Push-Pull) */
-#define PTR_PW_GPIO        GPIO_Pin_3
+/* PTR Power: removed on v1.1 board (PTR collector wired directly to VCC, no gating). */
 
 /* EEPROM */
 #define EEPROM_START_ADDR       0x001000

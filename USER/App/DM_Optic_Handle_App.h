@@ -47,26 +47,27 @@ typedef enum
 
 /**
   * @brief  Measures ADC value for a specific optical channel set.
-  * @note   Performs 10 measurements, sorts them, and returns the average of the middle 6.
+  * @note   LED on for wOnTime_us, then bursts 20 ADC samples, returns the sum of
+  *         the middle 14 (after sort/trim).
   * @param  tCh: Optical channel selection (0 to MAX-1).
-  * @param  wPWM: PWM duty cycle (0 to 399).
-  * @retval uint16_t: 12-bit filtered ADC result.
+  * @param  wOnTime_us: LED on-time before the ADC burst (us).
+  * @retval uint16_t: filtered ADC result.
   */
-uint16_t DM_App_Optic_Measure(OPTIC_CH_t tCh, uint16_t wPWM);
+uint16_t DM_App_Optic_Measure(OPTIC_CH_t tCh, uint16_t wOnTime_us);
 
 /**
-  * @brief  Returns the current PWM value for a specific optical channel.
+  * @brief  Returns the current on-time (us) for a specific optical channel.
   * @param  tCh: Optical channel selection.
-  * @retval uint16_t: Current PWM duty cycle.
+  * @retval uint16_t: Current on-time (us).
   */
-uint16_t DM_App_Optic_GetPWM(OPTIC_CH_t tCh);
+uint16_t DM_App_Optic_GetOnTime(OPTIC_CH_t tCh);
 
 /**
-  * @brief  Resets all channels' PWM values to 0.
+  * @brief  Resets all channels' on-time values to 0.
   * @param  None
   * @retval None
   */
-void DM_App_Optic_ResetPWM(void);
+void DM_App_Optic_ResetOnTime(void);
 
 /**
   * @brief  Measures initial PTR values for all 4 optic channels at PWM 199 and 399.

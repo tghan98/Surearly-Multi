@@ -61,16 +61,9 @@ void DM_HW_Drv_SystemClock_Init(void);
 void DM_HW_Drv_GPIO_Init(void);
 
 /**
-  * @brief  Initializes TIM2 for LED PWM control (5kHz).
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_LED_TIM2_Init(void);
-
-/**
   * @brief  Controls specific LED channel (LED1, LED2).
-  * @note   nLED1/nLED2 (PC0/PC1) are True Open-Drain, sink-only pins.
-  *         ENABLE turns LED ON (Low, sink), DISABLE turns LED OFF (HiZ, floating).
+  * @note   nLED1/nLED2 (PB4/PB3) are the cathode drive, Push-Pull.
+  *         ENABLE turns LED ON (Low, sink), DISABLE turns LED OFF (High).
   * @param  tCh: LED channel selection (CH_LED_1 or CH_LED_2).
   * @param  NewState: Target state (ENABLE or DISABLE).
   * @retval None
@@ -85,25 +78,11 @@ void DM_HW_Drv_LED_Control(LED_CH_t tCh, FunctionalState NewState);
 void DM_HW_Drv_SystemTick_TIM4_Init(void);
 
 /**
-  * @brief  Sets the LED PWM duty cycle.
-  * @param  wDuty_0_to_399: PWM duty cycle value (0 to 399).
+  * @brief  Blocking busy-wait for the LED on-time, in microseconds (approximate).
+  * @param  wMicroseconds: On-time to wait.
   * @retval None
   */
-void DM_HW_Drv_LED_Duty_Set(uint16_t wDuty_0_to_399);
-
-/**
-  * @brief  Starts the LED PWM output.
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_LED_PWM_Start(void);
-
-/**
-  * @brief  Stops the LED PWM output and ensures the pin is LOW.
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_LED_Stop(void);
+void DM_HW_Drv_Delay_us(uint16_t wMicroseconds);
 
 /**
   * @brief  Enters Core Sleep mode for 10ms using TIM4.
@@ -172,20 +151,6 @@ void DM_HW_Drv_USART_SendByte(uint8_t bData);
   * @retval None
   */
 void DM_HW_Drv_USART_SendWord(uint16_t wVal);
-
-/**
-  * @brief  Turns ON the PTR power (PB3 High).
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_PTR_Power_On(void);
-
-/**
-  * @brief  Turns OFF the PTR power (PB3 Low).
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_PTR_Power_Off(void);
 
 /**
   * @brief  Enters Halt mode and waits for a stick insertion (Falling edge on PB1).
