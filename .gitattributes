@@ -1,0 +1,8 @@
+* text=auto eol=crlf
+
+*.pdf binary
+*.jpg binary
+*.png binary
+*.o binary
+*.pbi binary
+*.pbd binary

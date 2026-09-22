@@ -1,4 +1,5 @@
 # IAR build output (auto-generated)
+*.dep
 Debug/Exe/
 Debug/List/
 Debug/Obj/
