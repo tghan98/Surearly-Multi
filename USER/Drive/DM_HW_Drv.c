@@ -251,6 +251,12 @@ void DM_HW_Drv_ADC_Init(void)
     ADC_Cmd(ADC1, ENABLE);
 }
 
+  void DM_HW_Drv_ADC_SetSamplingTime(ADC_Group_TypeDef tGroup,
+                     ADC_SamplingTime_TypeDef tSamplingTime)
+  {
+    ADC_SamplingTimeConfig(ADC1, tGroup, tSamplingTime);
+  }
+
 /**
   * @brief  Selects an ADC channel for a burst of reads (see header for rationale).
   * @param  ADC_Channel: The channel to select.

@@ -100,6 +100,9 @@ void DM_HW_Drv_SystemSleep_10ms(void);
   */
 void DM_HW_Drv_ADC_Init(void);
 
+void DM_HW_Drv_ADC_SetSamplingTime(ADC_Group_TypeDef tGroup,
+                                   ADC_SamplingTime_TypeDef tSamplingTime);
+
 /**
   * @brief  Selects an ADC channel for a burst of reads.
   * @note   Call once before a series of DM_HW_Drv_ADC_Read() calls on the same

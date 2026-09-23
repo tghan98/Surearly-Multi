@@ -43,6 +43,14 @@ typedef enum
 #define FAIL_OPTIC_CH2              0x12 /**< Channel 2 tuning failed after max iterations */
 #define FAIL_OPTIC_CH3              0x13 /**< Channel 3 tuning failed after max iterations */
 
+extern volatile uint16_t g_awDiag_A_Single[OPTIC_CH_MAX];
+extern volatile uint16_t g_awDiag_A_Sum14[OPTIC_CH_MAX];
+extern volatile uint16_t g_awDiag_B_Sum14[OPTIC_CH_MAX];
+extern volatile uint16_t g_awDiag_C_Sum14[OPTIC_CH_MAX][6];
+extern volatile uint16_t g_awDiag_D_Sum14[OPTIC_CH_MAX][5];
+extern volatile uint16_t g_awDiag_E_Sum14[OPTIC_CH_MAX][2];
+extern volatile uint8_t g_bOpticDiag_Complete;
+
 /* Exported Functions --------------------------------------------------------*/
 
 /**
@@ -54,6 +62,8 @@ typedef enum
   * @retval uint16_t: filtered ADC result.
   */
 uint16_t DM_App_Optic_Measure(OPTIC_CH_t tCh, uint16_t wOnTime_us);
+
+void DM_App_Optic_RunDiagnostic(void);
 
 /**
   * @brief  Returns the current on-time (us) for a specific optical channel.

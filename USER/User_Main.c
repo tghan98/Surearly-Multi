@@ -10,6 +10,7 @@
 #include "DM_HW_Drv.h"
 #include "DM_LCD_Stick_Check_App.h"
 #include "DM_Main_Sq_App.h"
+#include "DM_Optic_Handle_App.h"
 
 #include "Parameter_define.h"
 
@@ -75,6 +76,10 @@ int32_t User_Main_Init(void)
     
     /* Enable Global Interrupts */
     enableInterrupts();
+
+  #if _DEBUG_LCD_SEQ_ONLY
+    DM_App_Optic_RunDiagnostic();
+  #endif
     
     //LED_ON_Test();
 

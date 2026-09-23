@@ -43,6 +43,128 @@ static uint16_t gs_wOptic_OnTime[OPTIC_CH_MAX] = {
     OPTIC_ONTIME_DEFAULT, OPTIC_ONTIME_DEFAULT, OPTIC_ONTIME_DEFAULT, OPTIC_ONTIME_DEFAULT
 };
 
+volatile uint16_t g_awDiag_A_Single[OPTIC_CH_MAX];
+volatile uint16_t g_awDiag_A_Sum14[OPTIC_CH_MAX];
+volatile uint16_t g_awDiag_B_Sum14[OPTIC_CH_MAX];
+volatile uint16_t g_awDiag_C_Sum14[OPTIC_CH_MAX][6];
+volatile uint16_t g_awDiag_D_Sum14[OPTIC_CH_MAX][5];
+volatile uint16_t g_awDiag_E_Sum14[OPTIC_CH_MAX][2];
+volatile uint8_t g_bOpticDiag_Complete = 0;
+
+static const uint16_t gs_awDiag_WaitMs[6] = {0, 10, 20, 30, 40, 50};
+
+static uint16_t DM_App_Optic_DiagRead(OPTIC_CH_t tCh,
+                                      uint16_t wWaitMs,
+                                      uint16_t* pSingle)
+{
+    uint16_t awSamples[20];
+    uint32_t dwSum = 0;
+    uint16_t wTemp;
+    uint8_t i;
+    uint8_t j;
+
+    DM_HW_Drv_ADC_ChannelSelect(gs_tOptic_ADC[tCh]);
+    while (wWaitMs >= 10)
+    {
+        DM_HW_Drv_SystemSleep_10ms();
+        wWaitMs -= 10;
+    }
+
+    (void)DM_HW_Drv_ADC_Read();
+    for (i = 0; i < 20; i++)
+    {
+        awSamples[i] = DM_HW_Drv_ADC_Read();
+    }
+    DM_HW_Drv_ADC_ChannelDeselect(gs_tOptic_ADC[tCh]);
+
+    *pSingle = awSamples[9];
+    for (i = 0; i < 19; i++)
+    {
+        for (j = i + 1; j < 20; j++)
+        {
+            if (awSamples[i] > awSamples[j])
+            {
+                wTemp = awSamples[i];
+                awSamples[i] = awSamples[j];
+                awSamples[j] = wTemp;
+            }
+        }
+    }
+    for (i = 3; i <= 16; i++)
+    {
+        dwSum += awSamples[i];
+    }
+    return (uint16_t)dwSum;
+}
+
+void DM_App_Optic_RunDiagnostic(void)
+{
+    uint8_t bCh;
+    uint8_t bWait;
+    uint16_t wSingle;
+
+    g_bOpticDiag_Complete = 0;
+
+    for (bCh = 0; bCh < OPTIC_CH_MAX; bCh++)
+    {
+        DM_HW_Drv_LED_Control(gs_tOptic_LED[bCh], ENABLE);
+        g_awDiag_A_Sum14[bCh] = DM_App_Optic_DiagRead((OPTIC_CH_t)bCh, 20, &wSingle);
+        g_awDiag_A_Single[bCh] = wSingle;
+        DM_HW_Drv_LED_Control(gs_tOptic_LED[bCh], DISABLE);
+        DM_HW_Drv_SystemSleep_10ms();
+    }
+
+    for (bCh = 0; bCh < OPTIC_CH_MAX; bCh++)
+    {
+        g_awDiag_B_Sum14[bCh] = DM_App_Optic_DiagRead((OPTIC_CH_t)bCh, 0, &wSingle);
+        DM_HW_Drv_SystemSleep_10ms();
+    }
+
+    for (bCh = 0; bCh < OPTIC_CH_MAX; bCh++)
+    {
+        for (bWait = 0; bWait < 6; bWait++)
+        {
+            DM_HW_Drv_LED_Control(gs_tOptic_LED[bCh], ENABLE);
+            g_awDiag_C_Sum14[bCh][bWait] = DM_App_Optic_DiagRead(
+                (OPTIC_CH_t)bCh, gs_awDiag_WaitMs[bWait], &wSingle);
+            DM_HW_Drv_LED_Control(gs_tOptic_LED[bCh], DISABLE);
+            DM_HW_Drv_SystemSleep_10ms();
+        }
+    }
+
+    for (bCh = 0; bCh < OPTIC_CH_MAX; bCh++)
+    {
+        for (bWait = 0; bWait < 5; bWait++)
+        {
+            DM_HW_Drv_LED_Control(gs_tOptic_LED[bCh], ENABLE);
+            g_awDiag_D_Sum14[bCh][bWait] = DM_App_Optic_DiagRead(
+                (OPTIC_CH_t)bCh, 20, &wSingle);
+            DM_HW_Drv_LED_Control(gs_tOptic_LED[bCh], DISABLE);
+            DM_HW_Drv_SystemSleep_10ms();
+        }
+    }
+
+    DM_HW_Drv_ADC_SetSamplingTime(ADC_Group_SlowChannels, ADC_SamplingTime_16Cycles);
+    for (bCh = 0; bCh < OPTIC_CH_MAX; bCh++)
+    {
+        DM_HW_Drv_LED_Control(gs_tOptic_LED[bCh], ENABLE);
+        g_awDiag_E_Sum14[bCh][0] = DM_App_Optic_DiagRead((OPTIC_CH_t)bCh, 20, &wSingle);
+        DM_HW_Drv_LED_Control(gs_tOptic_LED[bCh], DISABLE);
+        DM_HW_Drv_SystemSleep_10ms();
+    }
+    DM_HW_Drv_ADC_SetSamplingTime(ADC_Group_SlowChannels, ADC_SamplingTime_384Cycles);
+    for (bCh = 0; bCh < OPTIC_CH_MAX; bCh++)
+    {
+        DM_HW_Drv_LED_Control(gs_tOptic_LED[bCh], ENABLE);
+        g_awDiag_E_Sum14[bCh][1] = DM_App_Optic_DiagRead((OPTIC_CH_t)bCh, 20, &wSingle);
+        DM_HW_Drv_LED_Control(gs_tOptic_LED[bCh], DISABLE);
+        DM_HW_Drv_SystemSleep_10ms();
+    }
+
+    DM_HW_Drv_ADC_SetSamplingTime(ADC_Group_SlowChannels, ADC_SamplingTime_16Cycles);
+    g_bOpticDiag_Complete = 1;
+}
+
 /* Functions -----------------------------------------------------------------*/
 
 /**
