@@ -76,10 +76,6 @@ int32_t User_Main_Init(void)
     
     /* Enable Global Interrupts */
     enableInterrupts();
-
-  #if _DEBUG_LCD_SEQ_ONLY
-    DM_App_Optic_RunDiagnostic();
-  #endif
     
     //LED_ON_Test();
 
@@ -122,21 +118,6 @@ INTERRUPT_HANDLER(TIM4_UPD_OVF_TRG_IRQHandler, 25)
     /* Refresh LCD Pins (Phase inversion and Blinking) */
     //if(DM_App_Main_Sq_Get_Step() != MAIN_SQ_IDLE) DM_App_LCD_Refresh();
     DM_App_LCD_Refresh();
-}
-
-/**
-  * @brief  ADC1 / Comparator Interrupt routine.
-  * @note   Used to wake up from sleep during ADC conversion.
-  * @param  None
-  * @retval None
-  */
-INTERRUPT_HANDLER(ADC1_COMP_IRQHandler, 18)
-{
-    /* Clear ADC1 End of Conversion (EOC) Interrupt Pending Bit */
-    ADC_ClearITPendingBit(ADC1, ADC_IT_EOC);
-    
-    /* Set global flag via setter function to notify that conversion is complete */
-    DM_HW_Drv_ADC_SetConvDone();
 }
 
 /**

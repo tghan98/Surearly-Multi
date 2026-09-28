@@ -14,31 +14,24 @@
 #define _nT_LINE_INT_THRESHOLD          1040    // T line intensity threshold
 #define _nC_LINE_INT_THRESHOLD          1050    // C line intensity threshold
 
-#define _nTAGET_LIGHT                   800    // Target ADC count for LED tuning
+#define _nTAGET_LIGHT                   1500   // Target ADC count for LED tuning
 
-#define OPTIC_TUNE_TOLERANCE        15  /**< Default tolerance for ADC tuning */
+/* Gain is an integer percent. Cal_Ratio() divides by 100 internally, so a
+   different scale here would need a different apply helper. */
+#define OPTIC_GAIN_SCALE                100
 
-/* Stick presence check via OPTIC_CH_3 (innermost sensor, LED1) at PWM 399 (Duty 100%).
+/* Stick presence check via OPTIC_CH_3 (innermost sensor, LED1) at 100% drive.
    A genuinely removed stick leaves no reflective body in front of this channel,
-   so the ADC reading collapses well below a normally-inserted stick's value. */
-#define OPTIC_STICK_REMOVE_THRESHOLD    1000    /**< Below this ADC value @ Duty100% => stick considered removed */
+   so the ADC reading collapses well below a normally-inserted stick's value.
+   Compared against the raw reading: after gain every channel lands near
+   _nTAGET_LIGHT and the present/removed gap disappears. */
+#define OPTIC_STICK_REMOVE_THRESHOLD    2600    /**< Midpoint of measured 1500 (absent) / 3700 (present) */
 #define OPTIC_STICK_CHECK_INTERVAL_MS   250     /**< Minimum interval between re-measurements (throttles LED/PTR cycling) */
 
-/* Acceptable range for DM_App_Optic_MeasureInitialStick()'s per-channel readings.
-   Outside either range => that channel is reported as ERROR_OPTIC_FAIL_CHx. */
-#define OPTIC_INITIAL_MIN_50            900     /**< Min acceptable ADC @ Duty 50% (PWM199) */
-#define OPTIC_INITIAL_MAX_50            2100    /**< Max acceptable ADC @ Duty 50% (PWM199) */
-#define OPTIC_INITIAL_MIN_100           1800    /**< Min acceptable ADC @ Duty 100% (PWM399) */
-#define OPTIC_INITIAL_MAX_100           4200    /**< Max acceptable ADC @ Duty 100% (PWM399) */
-
-/* On-time (us) for LED measurement (v1.1 board - replaces PWM duty control).
-   Stage 1 uses a fixed default; X1/X2/MAX are placeholders to be finalized from
-   the Stage 2 on-time sweep. Choose X1 < target on-time < X2 to bracket the
-   target (avoid extrapolation on the RC charging curve). */
-#define OPTIC_ONTIME_DEFAULT            800     /**< Fixed on-time for Stage 1 bring-up */
-#define OPTIC_ONTIME_MAX                1500    /**< Max on-time (stick-present check) - placeholder */
-#define OPTIC_ONTIME_X1                 500     /**< 2-point interpolation low point - placeholder */
-#define OPTIC_ONTIME_X2                 1000    /**< 2-point interpolation high point - placeholder */
+/* Acceptable range for DM_App_Optic_MeasureInitialStick()'s per-channel reading.
+   Raw (pre-gain) scale; outside => that channel is reported as ERROR_OPTIC_FAIL_CHx. */
+#define OPTIC_INITIAL_MIN_100           1500    /**< Min acceptable raw ADC @ 100% */
+#define OPTIC_INITIAL_MAX_100           3900    /**< Max acceptable raw ADC @ 100% */
 
 #define _nSCAN_MAX_CNT                  30      // Max allowed device usage/scan count
 
@@ -52,7 +45,7 @@
 // Debug
 // 1: Skip real measurement/EEPROM work in DM_Main_Sq_App step handlers and just
 //    delay-then-advance, so only the LCD sequence animations can be checked.
-#define _DEBUG_LCD_SEQ_ONLY             1
+#define _DEBUG_LCD_SEQ_ONLY             0
 #define _DEBUG_SEQ_STEP_DELAY           500     // 10ms units (500 = 5 sec)
 //------------------------------------------------------------------------------
 

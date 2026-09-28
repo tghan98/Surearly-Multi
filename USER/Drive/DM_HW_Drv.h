@@ -23,28 +23,10 @@ typedef enum
     CH_LED_MAX
 } LED_CH_t;
 
+/* Out of 12-bit range, so it cannot collide with a real conversion result. */
+#define ADC_READ_TIMEOUT    ((uint16_t)0xFFFF)
+
 /* Exported Functions --------------------------------------------------------*/
-
-/**
-  * @brief  Sets the ADC conversion completion flag.
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_ADC_SetConvDone(void);
-
-/**
-  * @brief  Returns the status of the ADC conversion completion flag.
-  * @param  None
-  * @retval 1 if done, 0 otherwise.
-  */
-uint8_t DM_HW_Drv_ADC_GetConvDone(void);
-
-/**
-  * @brief  Clears the ADC conversion completion flag.
-  * @param  None
-  * @retval None
-  */
-void DM_HW_Drv_ADC_ClearConvDone(void);
 
 /**
   * @brief  Initializes the system clock to 2MHz (HSI 16MHz / 8).
@@ -78,13 +60,6 @@ void DM_HW_Drv_LED_Control(LED_CH_t tCh, FunctionalState NewState);
 void DM_HW_Drv_SystemTick_TIM4_Init(void);
 
 /**
-  * @brief  Blocking busy-wait for the LED on-time, in microseconds (approximate).
-  * @param  wMicroseconds: On-time to wait.
-  * @retval None
-  */
-void DM_HW_Drv_Delay_us(uint16_t wMicroseconds);
-
-/**
   * @brief  Enters Core Sleep mode for 10ms using TIM4.
   * @note   TIM4 is enabled before sleep and disabled after wakeup.
   * @param  None
@@ -100,9 +75,6 @@ void DM_HW_Drv_SystemSleep_10ms(void);
   */
 void DM_HW_Drv_ADC_Init(void);
 
-void DM_HW_Drv_ADC_SetSamplingTime(ADC_Group_TypeDef tGroup,
-                                   ADC_SamplingTime_TypeDef tSamplingTime);
-
 /**
   * @brief  Selects an ADC channel for a burst of reads.
   * @note   Call once before a series of DM_HW_Drv_ADC_Read() calls on the same
@@ -115,13 +87,11 @@ void DM_HW_Drv_ADC_ChannelSelect(ADC_Channel_TypeDef ADC_Channel);
 
 /**
   * @brief  Performs a single 12-bit conversion on the currently selected channel.
-  * @note   DM_HW_Drv_ADC_ChannelSelect() must be called first. The first
-  *         conversion right after selecting a channel can be unstable (mux/
-  *         sample-and-hold settling); callers taking multiple samples per
-  *         channel (e.g. DM_App_Optic_Measure()'s sort-and-trim) rely on that
-  *         outlier rejection to absorb it rather than discarding it here.
+  * @note   DM_HW_Drv_ADC_ChannelSelect() must be called first, and the caller
+  *         discards the first conversion after a channel change (mux/sample-and-
+  *         hold settling).
   * @param  None
-  * @retval 12-bit ADC conversion result.
+  * @retval 12-bit ADC conversion result, or ADC_READ_TIMEOUT.
   */
 uint16_t DM_HW_Drv_ADC_Read(void);
 

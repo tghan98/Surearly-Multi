@@ -10,34 +10,7 @@
 
 #include "User_Main.h"
 
-/* Private variables ---------------------------------------------------------*/
-static volatile uint8_t gs_bADC_Conv_Done = 0;
-
 /* Functions -----------------------------------------------------------------*/
-
-/**
-  * @brief  Sets the ADC conversion completion flag.
-  */
-void DM_HW_Drv_ADC_SetConvDone(void)
-{
-    gs_bADC_Conv_Done = 1;
-}
-
-/**
-  * @brief  Returns the status of the ADC conversion completion flag.
-  */
-uint8_t DM_HW_Drv_ADC_GetConvDone(void)
-{
-    return gs_bADC_Conv_Done;
-}
-
-/**
-  * @brief  Clears the ADC conversion completion flag.
-  */
-void DM_HW_Drv_ADC_ClearConvDone(void)
-{
-    gs_bADC_Conv_Done = 0;
-}
 
 /**
   * @brief  Initializes the system clock to 2MHz (HSI 16MHz / 8).
@@ -167,36 +140,6 @@ void DM_HW_Drv_SystemTick_TIM4_Init(void)
     TIM4_Cmd(DISABLE);
 }
 
-/* Inner-loop repeats per requested microsecond. PLACEHOLDER - Stage 2 must
-   re-measure on real hardware (scope an LED pin) since fMASTER=2MHz gives only
-   0.5us/cycle and the true loop cost depends on the IAR build. */
-#define DELAY_US_CAL    1
-
-/**
-  * @brief  Blocking busy-wait for the LED on-time (approximate).
-  * @note   Interrupts are left as-is: during a measurement TIM4 is disabled
-  *         (only enabled inside DM_HW_Drv_SystemSleep_10ms()), so no LCD-refresh
-  *         tick perturbs this delay. The intended time is folded into the system
-  *         tick for the 5-minute wait accounting.
-  * @param  wMicroseconds: On-time to wait, in microseconds.
-  * @retval None
-  */
-void DM_HW_Drv_Delay_us(uint16_t wMicroseconds)
-{
-    uint16_t wUs;
-    volatile uint16_t n;
-
-    for (wUs = wMicroseconds; wUs > 0; wUs--)
-    {
-        for (n = 0; n < DELAY_US_CAL; n++)
-        {
-            /* busy spin - calibrate DELAY_US_CAL in Stage 2 */
-        }
-    }
-
-    SystemTick_AddUntracked_us(wMicroseconds);
-}
-
 /**
   * @brief  Enters Core Sleep mode for 10ms using TIM4.
   * @note   TIM4 is enabled before sleep and disabled after wakeup.
@@ -241,21 +184,13 @@ void DM_HW_Drv_ADC_Init(void)
     /* 1. Configure ADC1: Single Conversion, 12-bit, No clock division */
     ADC_Init(ADC1, ADC_ConversionMode_Single, ADC_Resolution_12Bit, ADC_Prescaler_1);
     
-    /* 2. Sampling time = 16 cycles (v1.1 board). The node cap (C12~C14, tens of
-       nF) supplies the S/H charge, so the 100k source does not gate sampling;
-       short sampling keeps the burst << on-time (see plan 2-1). Verify against
-       384 cycles in Stage 2. */
-    ADC_SamplingTimeConfig(ADC1, ADC_Group_SlowChannels, ADC_SamplingTime_16Cycles);
+/* 2. Sampling time = 384 cycles. The 100k PTR load needs the long sample
+       window; the 20ms settle before the burst makes the ~220us cost negligible. */
+    ADC_SamplingTimeConfig(ADC1, ADC_Group_SlowChannels, ADC_SamplingTime_384Cycles);
     
     /* 3. Wake up ADC from Power Down mode */
     ADC_Cmd(ADC1, ENABLE);
 }
-
-  void DM_HW_Drv_ADC_SetSamplingTime(ADC_Group_TypeDef tGroup,
-                     ADC_SamplingTime_TypeDef tSamplingTime)
-  {
-    ADC_SamplingTimeConfig(ADC1, tGroup, tSamplingTime);
-  }
 
 /**
   * @brief  Selects an ADC channel for a burst of reads (see header for rationale).
@@ -268,27 +203,39 @@ void DM_HW_Drv_ADC_ChannelSelect(ADC_Channel_TypeDef ADC_Channel)
     ADC_ChannelCmd(ADC1, ADC_Channel, ENABLE);
 }
 
-/* Sampling 16 cycles -> nominal (12+16)/2MHz ~= 14us per read. TENTATIVE: must
-   be re-measured on real hardware in Stage 4 (feeds the 5-minute wait tick
-   accounting, see GetSystemTick()). */
-#define ADC_READ_TIME_US    14
+/* (384 sampling + 12 conversion) / 2MHz ~= 198us. PROVISIONAL - confirm against
+   the Stage 4 five-minute wait re-measurement. */
+#define ADC_READ_TIME_US    198
+
+/* Roughly 10x a normal conversion. Only bounds a stuck EOC; not a timing source. */
+#define ADC_EOC_POLL_LIMIT  ((uint16_t)2000)
 
 /**
   * @brief  Performs a single 12-bit conversion on the currently selected channel.
   * @note   Busy-polls the EOC flag (no wfi/EOC interrupt).
   * @param  None
-  * @retval 12-bit ADC conversion result.
+  * @retval 12-bit result, or ADC_READ_TIMEOUT if EOC never asserted.
   */
 uint16_t DM_HW_Drv_ADC_Read(void)
 {
     uint16_t wADC_Result;
+    uint16_t wGuard;
 
     /* Start Software Conversion */
     ADC_SoftwareStartConv(ADC1);
 
     /* Busy-poll the EOC flag until the conversion completes */
-    while (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) == RESET)
+    for (wGuard = 0; wGuard < ADC_EOC_POLL_LIMIT; wGuard++)
     {
+        if (ADC_GetFlagStatus(ADC1, ADC_FLAG_EOC) != RESET)
+        {
+            break;
+        }
+    }
+
+    if (wGuard >= ADC_EOC_POLL_LIMIT)
+    {
+        return ADC_READ_TIMEOUT;
     }
 
     /* Read Result (reading clears the EOC flag) */
