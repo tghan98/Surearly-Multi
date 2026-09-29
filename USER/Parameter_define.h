@@ -14,11 +14,15 @@
 #define _nT_LINE_INT_THRESHOLD          1040    // T line intensity threshold
 #define _nC_LINE_INT_THRESHOLD          1050    // C line intensity threshold
 
-#define _nTAGET_LIGHT                   1500   // Target ADC count for LED tuning
+#define _nTAGET_LIGHT                   1200   // Target ADC count for LED tuning
 
 /* Gain is an integer percent. Cal_Ratio() divides by 100 internally, so a
    different scale here would need a different apply helper. */
 #define OPTIC_GAIN_SCALE                100
+
+/* Allowed deviation of the gain-applied value from _nTAGET_LIGHT. Rounding the
+   gain still leaves up to ~20.5 of error near the top of the 1500..3900 range. */
+#define OPTIC_TUNED_TOLERANCE           25
 
 /* Stick presence check via OPTIC_CH_3 (innermost sensor, LED1) at 100% drive.
    A genuinely removed stick leaves no reflective body in front of this channel,

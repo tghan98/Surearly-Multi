@@ -216,6 +216,7 @@ uint8_t DM_App_Optic_MeasureInitialStick(uint16_t* pBuffer)
 uint8_t DM_App_Optic_TuneTargetADC(uint16_t* pInitBuffer, uint16_t wTargetADC)
 {
     static uint8_t bCh;
+    uint16_t wTuned;
 
     for (bCh = 0; bCh < (uint8_t)OPTIC_CH_MAX; bCh++)
     {
@@ -230,33 +231,50 @@ uint8_t DM_App_Optic_TuneTargetADC(uint16_t* pInitBuffer, uint16_t wTargetADC)
             return (uint8_t)(FAIL_OPTIC_CH0 + bCh);
         }
 
-        /* Raw reading is guaranteed 1500..3900 here, so gain never exceeds 100. */
-        gs_wOptic_Gain[bCh] = (uint16_t)((uint32_t)wTargetADC * OPTIC_GAIN_SCALE / pInitBuffer[bCh]);
+        /* Round to nearest: truncation would bias the applied value low by up to
+           ~32 at this target. Raw reading is guaranteed 1500..3900 here, so the
+           gain stays within 31..80. */
+        gs_wOptic_Gain[bCh] = (uint16_t)(((uint32_t)wTargetADC * OPTIC_GAIN_SCALE
+                                          + pInitBuffer[bCh] / 2) / pInitBuffer[bCh]);
+
+        /* Verify the exact value CalcEmptyPTR() will store (same expression), so a
+           channel that cannot be brought near the target fails here rather than
+           silently landing outside tolerance. */
+        wTuned = Cal_Ratio(pInitBuffer[bCh], gs_wOptic_Gain[bCh]);
+        if ((wTuned < (uint16_t)(wTargetADC - OPTIC_TUNED_TOLERANCE)) ||
+            (wTuned > (uint16_t)(wTargetADC + OPTIC_TUNED_TOLERANCE)))
+        {
+            return (uint8_t)(FAIL_OPTIC_CH0 + bCh);
+        }
     }
 
     return OPTIC_SUCCESS;
 }
 
 /**
-  * @brief  Measures Empty PTR values for all 4 optic channels with the tuned gain applied.
-  * @param  pBuffer: Pointer to uint16_t array (size 4) to store measurements.
-  * @retval uint8_t: OPTIC_SUCCESS or OPTIC_ERR_STICK_REMOVED.
+  * @brief  Derives the Empty PTR values from the initial readings and the tuned gain.
+  * @note   No measurement: gain mode keeps the LED at 100%, so the initial reading,
+  *         taken under the same conditions, scaled by gain is the Empty value.
+  * @param  pInitBuffer: Initial readings from DM_App_Optic_MeasureInitialStick().
+  * @param  pBuffer: Pointer to uint16_t array (size 4) to store results.
+  * @retval uint8_t: OPTIC_SUCCESS or FAIL_OPTIC_CH0..CH3 if a channel's gain is 0.
   */
-uint8_t DM_App_Optic_MeasureEmptyPTR(uint16_t* pBuffer)
+uint8_t DM_App_Optic_CalcEmptyPTR(const uint16_t* pInitBuffer, uint16_t* pBuffer)
 {
     static uint8_t bCh;
 
     for (bCh = 0; bCh < (uint8_t)OPTIC_CH_MAX; bCh++)
     {
-        /* Guard-rail: uses DM_App_Optic_Check_StickPresent() directly instead of
-           DM_App_Stick_Get_Status(), so the reading is never served from its cache. */
-        if (!DM_App_Optic_Check_StickPresent())
+        /* Zero gain means TuneTargetADC() has not run. Fail loudly rather than
+           writing a plausible-looking number. Not reachable on the normal path
+           (gain lands in 31..80), only if the call order is broken. */
+        if (gs_wOptic_Gain[bCh] == 0)
         {
-            return OPTIC_ERR_STICK_REMOVED;
+            return (uint8_t)(FAIL_OPTIC_CH0 + bCh);
         }
 
-        /* Measure using the tuned gain for each channel */
-        pBuffer[bCh] = Cal_Ratio(DM_App_Optic_Measure((OPTIC_CH_t)bCh), gs_wOptic_Gain[bCh]);
+        /* Must match the expression checked in DM_App_Optic_TuneTargetADC(). */
+        pBuffer[bCh] = Cal_Ratio(pInitBuffer[bCh], gs_wOptic_Gain[bCh]);
     }
 
     return OPTIC_SUCCESS;

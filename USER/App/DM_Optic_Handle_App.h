@@ -96,12 +96,15 @@ uint8_t DM_App_Optic_MeasureInitialStick(uint16_t* pBuffer);
 uint8_t DM_App_Optic_TuneTargetADC(uint16_t* pInitBuffer, uint16_t wTargetADC);
 
 /**
-  * @brief  Measures Empty PTR values for all 4 optic channels with gain applied.
-  * @note   Checks stick insertion status during measurement.
-  * @param  pBuffer: Pointer to uint16_t array (size 4) to store measurements.
-  * @retval uint8_t: OPTIC_SUCCESS or OPTIC_ERR_STICK_REMOVED.
+  * @brief  Derives the Empty PTR values from the initial readings and the tuned gain.
+  * @note   No measurement here: gain mode keeps the LED at 100%, so the initial
+  *         reading, taken under the same conditions, scaled by gain is the Empty
+  *         value. Requires DM_App_Optic_TuneTargetADC() to have run first.
+  * @param  pInitBuffer: Initial readings from DM_App_Optic_MeasureInitialStick().
+  * @param  pBuffer: Pointer to uint16_t array (size 4) to store results.
+  * @retval uint8_t: OPTIC_SUCCESS or FAIL_OPTIC_CH0..CH3 if a channel's gain is 0.
   */
-uint8_t DM_App_Optic_MeasureEmptyPTR(uint16_t* pBuffer);
+uint8_t DM_App_Optic_CalcEmptyPTR(const uint16_t* pInitBuffer, uint16_t* pBuffer);
 
 /**
   * @brief  Immediately measures OPTIC_CH_3 (innermost sensor, LED1) at 100%

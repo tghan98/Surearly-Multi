@@ -280,11 +280,11 @@ static void DM_App_Main_Sq_Stick_Insert_Step_Handler(void)
         return;
     }
     
-    /* 5. Measure Empty PTR and store result directly in gs_awEmptyBand_LowData */
-    bResult = DM_App_Optic_MeasureEmptyPTR(gs_awEmptyBand_LowData);
-    if (bResult == OPTIC_ERR_STICK_REMOVED)
+    /* 5. Derive Empty PTR from the initial readings and the tuned gain */
+    bResult = DM_App_Optic_CalcEmptyPTR(gs_awInitialStickPtr, gs_awEmptyBand_LowData);
+    if (bResult != OPTIC_SUCCESS)
     {
-        DM_App_Main_Sq_Enter_Error(ERROR_STICK_REMOVE, LCD_SQ_ERR_STICK_REMOVE);
+        DM_App_Main_Sq_Enter_Error(bResult, LCD_SQ_ERR_STICK_FAIL);
         return;
     }
 
