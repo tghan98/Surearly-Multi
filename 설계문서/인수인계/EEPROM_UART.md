@@ -46,7 +46,7 @@ void DM_HW_Drv_EEPROM_Read(uint16_t wAddrOffset, uint8_t* pBuffer, uint16_t wLen
 | 1 | 1 byte | `ROM_OFFS_TEST_COMPLETE_COUNT` | `uint8_t` | 테스트 완료(사용) 누적 횟수. `_nSCAN_MAX_CNT`(30회) 도달 시 `ERROR_OVER_USED` 발생 |
 | 2 | 1 byte | `ROM_OFFS_ERROR_STEP` | `uint8_t` | 최근 에러 발생 시퀀스 스텝 |
 | 3 | 1 byte | `ROM_OFFS_ERROR_CODE` | `uint8_t` | 최근 에러 코드 (§1-4 표 참고) |
-| 4 ~ 19 | 16 bytes (`uint16_t[8]`) | `ROM_OFFS_STICK_PTR_DATA` | `uint16_t[8]` | 스틱 삽입 직후 4채널 × 2 Duty(50%/100%) 초기 광학 캘리브레이션 원시값(`DM_App_Optic_MeasureInitialStick()` 결과) |
+| 4 ~ 19 | 16 bytes (`uint16_t[8]`) | `ROM_OFFS_STICK_PTR_DATA` | `uint16_t[8]` | 스틱 삽입 직후 초기 광학 원시값 4워드(CH0~CH3)와 미사용 0 4워드(`DM_App_Optic_MeasureInitialStick()` 결과) |
 | 20 ~ 243 | 224 bytes (7채널 × 32 bytes) | `ROM_OFFS_RESULT_DATA` | `uint16_t[7][16]` | 최근 7회 테스트 결과 레코드 (순환 버퍼) |
 
 ### 1-3. 결과 레코드 내부 구성 (32 bytes = `uint16_t[16]`, 채널 1개당)
@@ -55,11 +55,11 @@ void DM_HW_Drv_EEPROM_Read(uint16_t wAddrOffset, uint8_t* pBuffer, uint16_t wLen
 
 | word idx | 항목 | word 수 | 상세 |
 |---|---|---|---|
-| 0~3 | PWM 값 | 4 | `OPTIC_CH_0`~`OPTIC_CH_3` 각 채널의 Optic PWM 듀티 값 |
+| 0~3 | 배율 값 | 4 | `OPTIC_CH_0`~`OPTIC_CH_3` 각 채널의 정수 퍼센트 배율(0~100) |
 | 4~7 | Empty Band 데이터 | 4 | 빈 스틱(Blank) 상태 T/BT/BC/C 밴드 ADC 값 (`gs_awEmptyBand_LowData[BAND_MAX]`) |
 | 8~11 | Result Band 데이터 | 4 | 실측 T/BT/BC/C 밴드 ADC 값 (`gs_awResultBand_LowData[BAND_MAX]`) |
 | 12~14 | 계산 결과 | 3 | `RES_T_INTENSITY`(T라인 강도), `RES_C_INTENSITY`(C라인 강도), `RES_YES_NO`(판정: 1=양성/0=음성) |
-| 15 | Dummy | 1 | 패딩(0x0000) |
+| 15 | Error Step / Error Code | 1 | 상위 바이트=에러 발생 스텝, 하위 바이트=에러 코드. 정상 회차는 `0x0000` |
 
 밴드/결과 열거형 (`USER/App/DM_Main_Sq_App.h`):
 
@@ -202,13 +202,13 @@ void DM_HW_Drv_USART_SendWord(uint16_t wVal);   // High byte 먼저, Low byte �
 
 | word idx (레코드 내) | 항목 |
 |---|---|
-| 0~3 | PWM 값 (CH0~CH3) |
+| 0~3 | 배율 값 (CH0~CH3) |
 | 4~7 | Empty Band (T, BT, BC, C) |
 | 8~11 | Result Band (T, BT, BC, C) |
 | 12 | T-Line Intensity |
 | 13 | C-Line Intensity |
 | 14 | 판정 (1=양성/YES, 0=음성/NO) |
-| 15 | Dummy |
+| 15 | Error Step / Error Code (상위 바이트 / 하위 바이트) |
 
 ---
 

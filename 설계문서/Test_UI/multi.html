@@ -353,8 +353,7 @@
     return name.replace(/_/g, ' ');
   }
 
-  const STICK_DUTY50_RANGE = [900, 2100];
-  const STICK_DUTY100_RANGE = [1800, 4200];
+  const STICK_RAW_RANGE = [1500, 3900];
   const EMPTY_VALUE = '-';
 
   function emptyRawDumpData() {
@@ -362,14 +361,15 @@
     return {
       firmwareVer: '', realFirmwareVer: '', lotUpper: '', lotLower: '',
       insertCount: EMPTY_VALUE, testCompleteCount: EMPTY_VALUE, errorStep: EMPTY_VALUE, errorCode: null,
-      initialStick: STICK_BANDS.map(band => ({ band, duty50: EMPTY_VALUE, duty100: EMPTY_VALUE })),
+      initialStick: STICK_BANDS.map(band => ({ band, value: EMPTY_VALUE })),
       records: Array.from({ length: 7 }, (_, slot) => ({
         slot,
-        pwm: [EMPTY_VALUE, EMPTY_VALUE, EMPTY_VALUE, EMPTY_VALUE],
+        gain: [EMPTY_VALUE, EMPTY_VALUE, EMPTY_VALUE, EMPTY_VALUE],
         emptyBand: { T: EMPTY_VALUE, BT: EMPTY_VALUE, BC: EMPTY_VALUE, C: EMPTY_VALUE },
         resultBand: { T: EMPTY_VALUE, BT: EMPTY_VALUE, BC: EMPTY_VALUE, C: EMPTY_VALUE },
         calc: { T_INTENSITY: EMPTY_VALUE, C_INTENSITY: EMPTY_VALUE, YES_NO: EMPTY_VALUE },
-        dummy: EMPTY_VALUE,
+        errorStep: EMPTY_VALUE,
+        errorCode: null,
       })),
     };
   }
@@ -621,16 +621,19 @@
     const errorCode = readWord();
 
     const STICK_BANDS = ['T', 'BT', 'BC', 'C'];
-    const initialStick = STICK_BANDS.map(band => ({ band, duty50: readWord(), duty100: readWord() }));
+    const initialStick = STICK_BANDS.map(band => ({ band, value: readWord() }));
+    for (let i = 0; i < 4; i++) readWord();
 
     const records = [];
     for (let slot = 0; slot < 7; slot++) {
-      const pwm = [readWord(), readWord(), readWord(), readWord()];
+      const gain = [readWord(), readWord(), readWord(), readWord()];
       const emptyBand = { T: readWord(), BT: readWord(), BC: readWord(), C: readWord() };
       const resultBand = { T: readWord(), BT: readWord(), BC: readWord(), C: readWord() };
       const calc = { T_INTENSITY: readWord(), C_INTENSITY: readWord(), YES_NO: readWord() };
       const dummy = readWord();
-      records.push({ slot, pwm, emptyBand, resultBand, calc, dummy });
+      const recErrStep = (dummy >> 8) & 0xFF;
+      const recErrCode = dummy & 0xFF;
+      records.push({ slot, gain, emptyBand, resultBand, calc, errorStep: recErrStep, errorCode: recErrCode });
     }
 
     return { firmwareVer, realFirmwareVer, lotUpper, lotLower, insertCount, testCompleteCount, errorStep, errorCode, initialStick, records };
@@ -655,21 +658,22 @@
   function buildRawDumpTablesHtml(d) {
     const latestSlot = typeof d.insertCount === 'number' ? ((d.insertCount - 1) % 7 + 7) % 7 : -1;
 
-    const stickHeaderCells = d.initialStick.map(s => `<th>${s.band} Duty 50%</th><th>${s.band} Duty 100%</th>`).join('');
+    const stickHeaderCells = d.initialStick.map(s => `<th>${s.band}</th>`).join('');
     const stickValueCells = d.initialStick.map(s => `
-      <td class="${isOutOfRange(s.duty50, STICK_DUTY50_RANGE) ? 'value-warn' : ''}">${s.duty50}</td>
-      <td class="${isOutOfRange(s.duty100, STICK_DUTY100_RANGE) ? 'value-warn' : ''}">${s.duty100}</td>
+      <td class="${isOutOfRange(s.value, STICK_RAW_RANGE) ? 'value-warn' : ''}">${s.value}</td>
     `).join('');
 
     const recordRows = d.records.map((r, i) => `
       <tr class="${i === latestSlot ? 'latest' : ''}">
         <td>${i + 1}</td>
-        <td>${r.pwm[0]}</td><td>${r.pwm[1]}</td><td>${r.pwm[2]}</td><td>${r.pwm[3]}</td>
+        <td>${r.gain[0]}</td><td>${r.gain[1]}</td><td>${r.gain[2]}</td><td>${r.gain[3]}</td>
         <td>${r.emptyBand.T}</td><td>${r.emptyBand.BT}</td><td>${r.emptyBand.BC}</td><td>${r.emptyBand.C}</td>
         <td>${r.resultBand.T}</td><td>${r.resultBand.BT}</td><td>${r.resultBand.BC}</td><td>${r.resultBand.C}</td>
         <td>${r.calc.T_INTENSITY}</td>
         <td>${r.calc.C_INTENSITY}</td>
         <td>${r.calc.YES_NO}</td>
+        <td>${r.errorStep}</td>
+        <td>${describeErrorCode(r.errorCode)}</td>
       </tr>
     `).join('');
 
@@ -691,20 +695,18 @@
 
       <div class="table-scroll">
         <table>
-          <thead><tr><th>필드</th><th>Insert Count</th><th>Test Complete Count</th><th>Error Step</th><th>Error Code</th></tr></thead>
+          <thead><tr><th>필드</th><th>Insert Count</th><th>Test Complete Count</th></tr></thead>
           <tbody>
             <tr>
               <td>데이터(Value)</td>
               <td>${d.insertCount}</td>
               <td>${d.testCompleteCount}</td>
-              <td>${d.errorStep}</td>
-              <td>${describeErrorCode(d.errorCode)}</td>
             </tr>
           </tbody>
         </table>
       </div>
 
-      <div class="range-note">Range: ${STICK_DUTY50_RANGE[0]} &lt; Duty 50% &lt; ${STICK_DUTY50_RANGE[1]} , ${STICK_DUTY100_RANGE[0]} &lt; Duty 100% &lt; ${STICK_DUTY100_RANGE[1]}</div>
+      <div class="range-note">Range: ${STICK_RAW_RANGE[0]} ≤ 측정값 ≤ ${STICK_RAW_RANGE[1]}</div>
       <div class="table-scroll">
         <table>
           <thead><tr><th>필드</th>${stickHeaderCells}</tr></thead>
@@ -717,10 +719,11 @@
           <thead>
             <tr>
               <th>필드</th>
-              <th>PWM CH1</th><th>PWM CH2</th><th>PWM CH3</th><th>PWM CH4</th>
+              <th>Gain CH1</th><th>Gain CH2</th><th>Gain CH3</th><th>Gain CH4</th>
               <th>ET</th><th>EBT</th><th>EBC</th><th>EC</th>
               <th>RT</th><th>RBT</th><th>RBC</th><th>RC</th>
               <th>T Intensity</th><th>C Intensity</th><th>Yes(1)/No(0)</th>
+              <th>Error Step</th><th>Error Code</th>
             </tr>
           </thead>
           <tbody>${recordRows}</tbody>
@@ -745,20 +748,21 @@
     rows.push(['필드', 'Firmware Ver.', 'Real Firmware Ver.', 'LOT. Upper', 'LOT. Lower']);
     rows.push(['데이터(String)', d.firmwareVer, d.realFirmwareVer, d.lotUpper, d.lotLower]);
     rows.push([]);
-    rows.push(['필드', 'Insert Count', 'Test Complete Count', 'Error Step', 'Error Code']);
-    rows.push(['데이터(Value)', d.insertCount, d.testCompleteCount, d.errorStep, describeErrorCode(d.errorCode)]);
+    rows.push(['필드', 'Insert Count', 'Test Complete Count']);
+    rows.push(['데이터(Value)', d.insertCount, d.testCompleteCount]);
     rows.push([]);
-    rows.push(['필드', ...d.initialStick.flatMap(s => [`${s.band} Duty 50%`, `${s.band} Duty 100%`])]);
-    rows.push(['데이터(Value)', ...d.initialStick.flatMap(s => [s.duty50, s.duty100])]);
+    rows.push(['필드', ...d.initialStick.map(s => s.band)]);
+    rows.push(['데이터(Value)', ...d.initialStick.map(s => s.value)]);
     rows.push([]);
-    rows.push(['필드', 'PWM CH1', 'PWM CH2', 'PWM CH3', 'PWM CH4', 'ET', 'EBT', 'EBC', 'EC', 'RT', 'RBT', 'RBC', 'RC', 'T Intensity', 'C Intensity', 'Yes(1)/No(0)']);
+    rows.push(['필드', 'Gain CH1', 'Gain CH2', 'Gain CH3', 'Gain CH4', 'ET', 'EBT', 'EBC', 'EC', 'RT', 'RBT', 'RBC', 'RC', 'T Intensity', 'C Intensity', 'Yes(1)/No(0)', 'Error Step', 'Error Code']);
     d.records.forEach((r, i) => {
       rows.push([
         i + 1,
-        r.pwm[0], r.pwm[1], r.pwm[2], r.pwm[3],
+        r.gain[0], r.gain[1], r.gain[2], r.gain[3],
         r.emptyBand.T, r.emptyBand.BT, r.emptyBand.BC, r.emptyBand.C,
         r.resultBand.T, r.resultBand.BT, r.resultBand.BC, r.resultBand.C,
         r.calc.T_INTENSITY, r.calc.C_INTENSITY, r.calc.YES_NO,
+        r.errorStep, describeErrorCode(r.errorCode),
       ]);
     });
     return rows.map(row => row.map(csvEscape).join(',')).join('\r\n');

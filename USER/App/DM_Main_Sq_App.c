@@ -227,6 +227,8 @@ static void DM_App_Main_Sq_Stick_Insert_Step_Handler(void)
     /* 0. Reset stale measurement/result data from the previous cycle so an
        early failure below doesn't save leftover data from a prior test to ROM. */
     DM_App_Optic_ResetGain();
+    gs_bErrorCode = 0;
+    gs_bErrorSequence = 0;
     for (i = 0; i < BAND_MAX; i++)
     {
         gs_awEmptyBand_LowData[i]  = 0;
@@ -715,8 +717,8 @@ void DM_App_Main_Sq_Save_Result_To_Rom(uint8_t bSaveIndex)
         awRomBuffer[idx++] = gs_awResult[i];
     }
 
-    /* 5. Pack Dummy (2 bytes) */
-    awRomBuffer[idx++] = 0x0000;
+    /* 5. Pack the current error step in the high byte and error code in the low byte. */
+    awRomBuffer[idx++] = (uint16_t)(((uint16_t)gs_bErrorSequence << 8) | gs_bErrorCode);
 
     /* 6. Save to ROM using index */
     DM_App_Rom_Save_CurrentResult(bSaveIndex, awRomBuffer);
