@@ -287,10 +287,12 @@ uint8_t DM_App_Optic_CalcEmptyPTR(const uint16_t* pInitBuffer, uint16_t* pBuffer
   * @param  None
   * @retval uint8_t: 1 if stick present, 0 if removed.
   */
+volatile uint16_t g_DbgStickADC;
+
 uint8_t DM_App_Optic_Check_StickPresent(void)
 {
     uint16_t wADC = DM_App_Optic_Measure(OPTIC_CH_3);
-
+    g_DbgStickADC = wADC;
     return (wADC < OPTIC_STICK_REMOVE_THRESHOLD) ? 0 : 1;
 }
 

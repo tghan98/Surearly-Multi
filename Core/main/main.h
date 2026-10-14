@@ -81,7 +81,11 @@ extern "C" {
 #define LCD_SEG0_GPIO_PORT	GPIOC
 #define LCD_SEG1_GPIO_PORT	GPIOC
 #define LCD_SEG2_GPIO_PORT	GPIOD
-#define LCD_SEG3_GPIO_PORT	GPIOB
+/* !!! 임시 (2026-10-13) — 회수 기기(구 보드)는 물방울이 PC4에 물려 있다.
+       구형 펌웨어 BSP_HW_Config.h = GPIOC/Pin_4, 실측 TM 패드 1.25V 토글로 확인.
+       신형은 PB0(v1.1 회로도)으로 보내고 있어 물방울이 안 떴다.
+       확인용 임시 변경. 보드 리비전 대응 방침이 정해지면 원복/정식 반영할 것. !!! */
+#define LCD_SEG3_GPIO_PORT	GPIOC	/* 임시: 원래 GPIOB */
 
 //Pin
 #define LCD_COM0_GPIO_PIN       GPIO_Pin_2
@@ -89,7 +93,7 @@ extern "C" {
 #define LCD_SEG0_GPIO_PIN	GPIO_Pin_5
 #define LCD_SEG1_GPIO_PIN	GPIO_Pin_6
 #define LCD_SEG2_GPIO_PIN       GPIO_Pin_0
-#define LCD_SEG3_GPIO_PIN	GPIO_Pin_0
+#define LCD_SEG3_GPIO_PIN	GPIO_Pin_4	/* 임시: 원래 GPIO_Pin_0 */
 
 // LCD Matching --> This Define Use LCD Control
 #define LCD_BOOK_PORT           LCD_SEG0_GPIO_PORT
