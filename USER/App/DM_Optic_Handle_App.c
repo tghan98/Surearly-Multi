@@ -280,20 +280,33 @@ uint8_t DM_App_Optic_CalcEmptyPTR(const uint16_t* pInitBuffer, uint16_t* pBuffer
     return OPTIC_SUCCESS;
 }
 
-
 /**
   * @brief  Immediately measures OPTIC_CH_3 (innermost sensor, LED1) at Duty 100%
   *         and judges whether the stick is physically present.
   * @param  None
   * @retval uint8_t: 1 if stick present, 0 if removed.
   */
-volatile uint16_t g_DbgStickADC;
 
 uint8_t DM_App_Optic_Check_StickPresent(void)
 {
     uint16_t wADC = DM_App_Optic_Measure(OPTIC_CH_3);
-    g_DbgStickADC = wADC;
     return (wADC < OPTIC_STICK_REMOVE_THRESHOLD) ? 0 : 1;
+}
+
+/**
+  * @brief  Measures OPTIC_CH_3 and judges stick presence on the GAIN-APPLIED scale.
+  * @note   전제: 배율이 계산된 뒤에만 부를 것.
+  *         배율이 0이면 Cal_Ratio() 결과가 0이 되어 항상 "빠짐"으로 나온다.
+  *         현재 호출처는 DM_App_Stick_Get_Status() 하나뿐이고,
+  *         그것은 대기 루프(배율 계산 이후)에서만 돌아간다.
+  * @param  None
+  * @retval uint8_t: 1 if stick present, 0 if removed.
+  */
+uint8_t DM_App_Optic_Check_StickPresent_Scaled(void)
+{
+    uint16_t wVal = Cal_Ratio(DM_App_Optic_Measure(OPTIC_CH_3),
+                              DM_App_Optic_GetGain(OPTIC_CH_3));
+    return (wVal < OPTIC_STICK_REMOVE_THRESHOLD_SCALED) ? 0 : 1;
 }
 
 //LED test
@@ -304,7 +317,6 @@ void LED_ON_Test(void)
 
     DM_HW_Drv_SystemSleep_10ms();
 }
-
 
 
 /************************ (C) COPYRIGHT Surearly Multi *****END OF FILE****/

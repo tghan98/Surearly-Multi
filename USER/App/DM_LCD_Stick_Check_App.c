@@ -233,7 +233,10 @@ STICK_STATUS_t DM_App_Stick_Get_Status(void)
     }
 
     wCheckCounter = 0;
-    tCachedStatus = DM_App_Optic_Check_StickPresent() ? STICK_STATUS_INSERTED : STICK_STATUS_REMOVED;
+    /* 이 함수는 배율 계산 이후의 대기 루프에서만 불린다.
+       시료가 C 밴드를 적시면 원본값이 문턱값 근처까지 내려오므로,
+       기기 차이가 정규화된 배율 적용값으로 판정한다. (2026-10-14) */
+    tCachedStatus = DM_App_Optic_Check_StickPresent_Scaled() ? STICK_STATUS_INSERTED : STICK_STATUS_REMOVED;
 
     return tCachedStatus;
 }
