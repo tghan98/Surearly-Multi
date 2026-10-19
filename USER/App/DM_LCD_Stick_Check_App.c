@@ -208,6 +208,30 @@ LCD_SQ_STEP_t DM_App_LCD_Sq_Get_Step(void)
     return gs_tLCD_Sq_Step;
 }
 
+/* 재측정 스로틀 상태. 원래 DM_App_Stick_Get_Status() 안의 지역 static 이었으나,
+   삽입 회차마다 초기화할 수 있도록 파일 범위로 올렸다. (2026-10-19)
+   wCheckCounter 를 INTERVAL_COUNT 로 두는 것은 "다음 호출에서 곧바로 실측하라"는
+   뜻이다. 0 으로 두면 25번을 더 기다린 뒤에야 실측한다. */
+static uint16_t      gs_wStickCheckCounter = OPTIC_STICK_CHECK_INTERVAL_COUNT;
+static STICK_STATUS_t gs_tStickCachedStatus = STICK_STATUS_INSERTED;
+
+/**
+  * @brief  Clears the cached stick status so the next query re-measures.
+  * @note   이 캐시는 static 이라 전원이 끊기기 전까지 살아 있다. 기기는 측정이
+  *         끝나도 Halt 로 잠들 뿐이므로, 이전 회차가 "빠짐"으로 끝나면 그 값이
+  *         다음 회차의 첫 판정에 그대로 쓰여 실측 없이 에러가 난다.
+  *         (2026-10-19 실측: 스틱을 뺀 직후 새 스틱을 꽂으면 삽입 단계에서 즉시
+  *          ERROR_STICK_REMOVE. 덤프의 최저값이 초기값 그대로였다 = 한 번도 재지 않음)
+  *         그래서 삽입 시퀀스 시작부에서 반드시 이 함수를 부른다.
+  * @param  None
+  * @retval None
+  */
+void DM_App_Stick_Reset_Status(void)
+{
+    gs_wStickCheckCounter = OPTIC_STICK_CHECK_INTERVAL_COUNT;  /* 다음 호출에서 즉시 실측 */
+    gs_tStickCachedStatus = STICK_STATUS_INSERTED;
+}
+
 /**
   * @brief  Returns the current stick presence status.
   * @note   STP_CK switch is used only as the Halt wake-up trigger (unreliable for
@@ -223,22 +247,19 @@ LCD_SQ_STEP_t DM_App_LCD_Sq_Get_Step(void)
   */
 STICK_STATUS_t DM_App_Stick_Get_Status(void)
 {
-    static uint16_t wCheckCounter = OPTIC_STICK_CHECK_INTERVAL_COUNT;
-    static STICK_STATUS_t tCachedStatus = STICK_STATUS_INSERTED;
-
-    if (wCheckCounter < OPTIC_STICK_CHECK_INTERVAL_COUNT)
+    if (gs_wStickCheckCounter < OPTIC_STICK_CHECK_INTERVAL_COUNT)
     {
-        wCheckCounter++;
-        return tCachedStatus;
+        gs_wStickCheckCounter++;
+        return gs_tStickCachedStatus;
     }
 
-    wCheckCounter = 0;
+    gs_wStickCheckCounter = 0;
     /* 이 함수는 배율 계산 이후의 대기 루프에서만 불린다.
        시료가 C 밴드를 적시면 원본값이 문턱값 근처까지 내려오므로,
        기기 차이가 정규화된 배율 적용값으로 판정한다. (2026-10-14) */
-    tCachedStatus = DM_App_Optic_Check_StickPresent_Scaled() ? STICK_STATUS_INSERTED : STICK_STATUS_REMOVED;
+    gs_tStickCachedStatus = DM_App_Optic_Check_StickPresent_Scaled() ? STICK_STATUS_INSERTED : STICK_STATUS_REMOVED;
 
-    return tCachedStatus;
+    return gs_tStickCachedStatus;
 }
 
 /**

@@ -21,6 +21,11 @@ static uint16_t gs_wMain_Sq_Timer = 0;
 
 /* Global variables for measurement and tracking */
 static uint8_t gs_bStickInsertCnt = 0;
+
+/* === 임시 디버그 (2026-10-19) — 원복할 것 ===
+   DM_Optic_Handle_App.c 에 정의된 이번 회차 최저 배율 적용값. */
+extern uint16_t g_DbgMinVal;
+/* === 임시 디버그 끝 === */
 static uint8_t gs_bTestCompleteCount = 0;
 static uint8_t gs_bErrorCode = 0;
 static uint8_t gs_bErrorSequence = 0;
@@ -227,6 +232,7 @@ static void DM_App_Main_Sq_Stick_Insert_Step_Handler(void)
     /* 0. Reset stale measurement/result data from the previous cycle so an
        early failure below doesn't save leftover data from a prior test to ROM. */
     DM_App_Optic_ResetGain();
+    DM_App_Stick_Reset_Status();   /* 이전 회차의 스틱 판정 캐시도 함께 지운다 (2026-10-19) */
     gs_bErrorCode = 0;
     gs_bErrorSequence = 0;
     for (i = 0; i < BAND_MAX; i++)
@@ -717,6 +723,18 @@ void DM_App_Main_Sq_Save_Result_To_Rom(uint8_t bSaveIndex)
         awRomBuffer[idx++] = gs_awResult[i];
     }
 
+    /* === 임시 디버그 (2026-10-19) — 원복할 것 ==============================
+       스틱 유무 판정의 이번 회차 최저값을 T Intensity 칸에 실어 보낸다.
+       레코드 16칸이 전부 차 있어 빈 자리가 없고, T Intensity 는 같은 레코드의
+       RT·ET·RBT·EBT 로 다시 계산할 수 있어 잃는 정보가 없기 때문이다.
+       (덤프 CSV 의 'T Intensity' 열이 평소와 다른 값을 뜻하게 되므로 주의)
+       실은 뒤 0xFFFF 로 되돌려야 다음 회차에 이번 값이 따라붙지 않는다.
+       idx 는 여기서 15. gs_awResult 는 idx-3(=12)부터 시작하므로
+       T Intensity 는 awRomBuffer[12] 다.                                   */
+    awRomBuffer[idx - RES_MAX + RES_T_INTENSITY] = g_DbgMinVal;
+    g_DbgMinVal = 0xFFFF;
+    /* === 임시 디버그 끝 ================================================== */
+
     /* 5. Pack the current error step in the high byte and error code in the low byte. */
     awRomBuffer[idx++] = (uint16_t)(((uint16_t)gs_bErrorSequence << 8) | gs_bErrorCode);
 
@@ -834,6 +852,7 @@ static void DM_App_Main_Sq_Send_FixedStr(const char* pcStr, uint8_t bLen)
 void DM_App_Main_Sq_Send_RawDump(void)
 {
     static uint8_t i, j;
+    uint8_t bStart, bSlot;
     uint16_t awResultRec[16];
 
     /* 0. Firmware version / LOT info (fixed-width header, sent first) */
@@ -855,10 +874,14 @@ void DM_App_Main_Sq_Send_RawDump(void)
         DM_HW_Drv_USART_SendWord(gs_awInitialStickPtr[i]);
     }
 
-    /* 3. All 7 stored result records (16 words each, including dummy) */
+    /* 3. All 7 stored result records (16 words each, including dummy)
+          최신 레코드부터 과거 순으로 보낸다. 링버퍼라 칸 번호 자체는 시간순이
+          아니므로, 마지막으로 저장한 칸을 시작점으로 삼아 거꾸로 돈다. */
+    bStart = DM_App_Rom_Get_DumpPos();
     for (i = 0; i < 7; i++)
     {
-        DM_App_Rom_Get_ResultData(i, awResultRec);
+        bSlot = (uint8_t)((bStart + 7 - i) % 7);
+        DM_App_Rom_Get_ResultData(bSlot, awResultRec);
 
         for (j = 0; j < 16; j++)
         {

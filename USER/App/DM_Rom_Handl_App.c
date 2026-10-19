@@ -28,6 +28,11 @@
 #define RESULT_CHANNEL_MAX              7   /**< Maximum number of stored results */
 #define RESULT_DATA_SIZE                32  /**< size of 16 shorts in bytes */
 
+/* 최근 결과가 저장된 칸 번호(0~6). 덤프를 최신순으로 내보내기 위한 시작점.
+   삽입 횟수에서 계산해도 되지만, InsertCount는 1바이트라 255에서 0으로
+   초기화되므로 그 시점에 최신 위치를 잘못 짚는다. 별도로 적어둔다. (2026-10-19) */
+#define ROM_OFFS_DUMP_POS               244 /**< Offset for latest result slot (1 Byte) */
+
 /* Functions -----------------------------------------------------------------*/
 
 /**
@@ -197,6 +202,38 @@ void DM_App_Rom_Get_ResultData(uint8_t bChannel, uint16_t* pBuffer)
 }
 
 /**
+  * @brief  Reads the slot index of the most recently saved result.
+  * @note   유효 범위는 0 ~ 6. 미기록(0xFF)이거나 범위를 벗어나면 0으로 본다.
+  * @param  None
+  * @retval uint8_t: Slot index (0 ~ 6).
+  */
+uint8_t DM_App_Rom_Get_DumpPos(void)
+{
+    uint8_t bData = 0;
+    DM_HW_Drv_EEPROM_Read(ROM_OFFS_DUMP_POS, &bData, 1);
+
+    /* Initial state / out-of-range check.
+       구형 펌웨어로 이미 결과를 쌓아둔 기기는 이 자리가 0xFF로 비어 있다.
+       그때만 삽입 횟수에서 역산한다. 한 번 저장하고 나면 적어둔 값을 쓴다. */
+    if (bData >= RESULT_CHANNEL_MAX)
+    {
+        uint8_t bCnt = DM_App_Rom_Get_InsertCount();
+        bData = (bCnt > 0) ? (uint8_t)((bCnt - 1) % RESULT_CHANNEL_MAX) : 0;
+    }
+    return bData;
+}
+
+/**
+  * @brief  Writes the slot index of the most recently saved result.
+  * @param  bPos: Slot index (0 ~ 6).
+  * @retval None
+  */
+void DM_App_Rom_Set_DumpPos(uint8_t bPos)
+{
+    DM_HW_Drv_EEPROM_Write(ROM_OFFS_DUMP_POS, &bPos, 1);
+}
+
+/**
   * @brief  Saves 16 result data (short) to the current channel.
   * @note   Channel index is wrap-around using (bIndex % 7).
   * @param  bIndex: Target channel index or current count.
@@ -214,6 +251,11 @@ void DM_App_Rom_Save_CurrentResult(uint8_t bIndex, const uint16_t* pBuffer)
     wAddr = ROM_OFFS_RESULT_DATA + (uint16_t)(bChannel * RESULT_DATA_SIZE);
     
     DM_HW_Drv_EEPROM_Write(wAddr, (uint8_t*)pBuffer, RESULT_DATA_SIZE);
+
+    /* 방금 쓴 칸 번호를 남긴다. 덤프를 최신순으로 내보낼 때의 시작점이 된다.
+       호출처(442/749/781행)가 아니라 여기서 적는 이유는, 저장 위치를 계산하는
+       자리가 여기 하나뿐이라 두 값이 어긋날 틈이 없기 때문이다. */
+    DM_App_Rom_Set_DumpPos(bChannel);
 }
 
 /************************ (C) COPYRIGHT Surearly Multi *****END OF FILE****/

@@ -103,6 +103,15 @@ LCD_SQ_STEP_t DM_App_LCD_Sq_Get_Step(void);
 STICK_STATUS_t DM_App_Stick_Get_Status(void);
 
 /**
+  * @brief  Clears the cached stick status so the next query re-measures.
+  * @note   Must be called at the start of each stick-insert sequence.
+  *         자세한 이유는 .c 쪽 주석 참조. (2026-10-19)
+  * @param  None
+  * @retval None
+  */
+void DM_App_Stick_Reset_Status(void);
+
+/**
   * @brief  Sets the target state of a specific LCD channel.
   * @param  tCh: LCD channel (BOOK, DROP, YES, NO, or ALL).
   * @param  tState: Target state (OFF, ON, BLINK).

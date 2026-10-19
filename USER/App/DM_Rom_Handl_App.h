@@ -113,4 +113,19 @@ void DM_App_Rom_Get_ResultData(uint8_t bChannel, uint16_t* pBuffer);
   */
 void DM_App_Rom_Save_CurrentResult(uint8_t bIndex, const uint16_t* pBuffer);
 
+/**
+  * @brief  Reads the slot index of the most recently saved result.
+  * @note   Valid range 0 ~ 6. Returns 0 if unwritten (0xFF) or out of range.
+  * @param  None
+  * @retval uint8_t: Slot index (0 ~ 6).
+  */
+uint8_t DM_App_Rom_Get_DumpPos(void);
+
+/**
+  * @brief  Writes the slot index of the most recently saved result.
+  * @param  bPos: Slot index (0 ~ 6).
+  * @retval None
+  */
+void DM_App_Rom_Set_DumpPos(uint8_t bPos);
+
 #endif /* __DM_ROM_HAND_APP_H__ */

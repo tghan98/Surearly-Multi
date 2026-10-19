@@ -293,6 +293,17 @@ uint8_t DM_App_Optic_Check_StickPresent(void)
     return (wADC < OPTIC_STICK_REMOVE_THRESHOLD) ? 0 : 1;
 }
 
+/* === 임시 디버그 변수 (2026-10-19) =========================================
+   스틱 유무 판정에 쓰인 배율 적용값의 "이번 회차 최저값"을 붙잡아둔다.
+   이 기기는 대기 중 코어가 자고 있어(while+wfi) 디버거 Break가 먹히지 않으므로,
+   값을 결과 레코드에 실어 덤프 CSV로 읽는다. (DM_Main_Sq_App.c 쪽도 함께 수정)
+   최저값은 "더 낮을 때만" 갱신되므로, 레코드에 실은 직후 0xFFFF로 되돌려야
+   다음 회차에 이전 회차 값이 따라붙지 않는다.
+   ※ 원인 확정 후 이 블록, 함수 안의 임시 구간, 그리고 DM_Main_Sq_App.c 의
+     임시 구간을 함께 삭제할 것.                                             */
+uint16_t g_DbgMinVal = 0xFFFF;   /* 이번 회차에 본 최저 배율 적용값 */
+/* ========================================================================= */
+
 /**
   * @brief  Measures OPTIC_CH_3 and judges stick presence on the GAIN-APPLIED scale.
   * @note   전제: 배율이 계산된 뒤에만 부를 것.
@@ -306,6 +317,14 @@ uint8_t DM_App_Optic_Check_StickPresent_Scaled(void)
 {
     uint16_t wVal = Cal_Ratio(DM_App_Optic_Measure(OPTIC_CH_3),
                               DM_App_Optic_GetGain(OPTIC_CH_3));
+
+    /* === 임시 디버그 (2026-10-19) — 원복할 것 === */
+    if (wVal < g_DbgMinVal)      /* 성공/실패 무관하게 최저값을 계속 갱신 */
+    {
+        g_DbgMinVal = wVal;
+    }
+    /* === 임시 디버그 끝 === */
+
     return (wVal < OPTIC_STICK_REMOVE_THRESHOLD_SCALED) ? 0 : 1;
 }
 
