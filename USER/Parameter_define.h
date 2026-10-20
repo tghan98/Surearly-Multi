@@ -32,10 +32,12 @@
 #define OPTIC_STICK_REMOVE_THRESHOLD    2600    /**< Midpoint of measured 1500 (absent) / 3700 (present) */
 /* 배율을 적용한 값과 비교할 문턱값. 대기 루프 전용.
    배율은 마른 스틱을 _nTAGET_LIGHT(1,200)에 맞추므로 기기 차이가 정규화된다.
-   1번 기기 실측 (2026-10-14, 2.89V, 배율 32):
-     마른 스틱 1,172 / 젖은 스틱 최저 800 / 빈 상태 449
-   449와 800의 중간값. 1대로 정한 수치이므로 2사이클 결과를 보고 재검토할 것. */
-#define OPTIC_STICK_REMOVE_THRESHOLD_SCALED  625
+   정상 기기 6대 실측 (2026-10-19, 기기 1·2·5·10·11·12):
+     스틱이 꽂힌 상태의 최저값   625 (5번)   <- 이 아래로는 내려가면 안 된다
+     스틱을 뺀 빈 상태의 최고값  488 (11번)  <- 이 위로는 올라가면 안 된다
+   두 값의 중간 (488+625)/2 = 556. 양쪽 여유 약 68.
+   이전 값 625는 위쪽 울타리와 같아 여유가 0이었다. (2026-10-20 변경) */
+#define OPTIC_STICK_REMOVE_THRESHOLD_SCALED  556
 
 #define OPTIC_STICK_CHECK_INTERVAL_MS   250     /**< Minimum interval between re-measurements (throttles LED/PTR cycling) */
 

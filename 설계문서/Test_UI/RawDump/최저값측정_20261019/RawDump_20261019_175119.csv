@@ -1,0 +1,17 @@
+﻿필드,Firmware Ver.,Real Firmware Ver.,LOT. Upper,LOT. Lower
+데이터(String),v2.1,v2.1.1.2,HCGM,19001
+
+필드,Insert Count,Test Complete Count
+데이터(Value),17,0
+
+필드,T,BT,BC,C
+데이터(Value),3516,3603,3594,3610
+
+필드,Gain CH1,Gain CH2,Gain CH3,Gain CH4,ET,EBT,EBC,EC,RT,RBT,RBC,RC,T Intensity,C Intensity,Yes(1)/No(0),Error Step,Error Code
+1,0,0,0,0,0,0,0,0,0,0,0,0,65535,0,0,1,ERROR OPTIC FAIL CH0
+2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,ERROR OPTIC FAIL CH0
+3,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,ERROR OPTIC FAIL CH0
+4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,ERROR OPTIC FAIL CH0
+5,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,ERROR OPTIC FAIL CH0
+6,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,ERROR OPTIC FAIL CH0
+7,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,ERROR OPTIC FAIL CH0
