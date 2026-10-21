@@ -281,17 +281,36 @@ uint8_t DM_App_Optic_CalcEmptyPTR(const uint16_t* pInitBuffer, uint16_t* pBuffer
 }
 
 /**
+  * @brief  Immediately measures OPTIC_CH_3 (innermost sensor, LED1) at Duty 100%,
+  *         judges stick presence, and hands back the raw reading.
+  * @param  pADC: Receives the raw (pre-gain) CH3 reading. May be NULL.
+  * @retval uint8_t: 1 if stick present, 0 if removed.
+  */
+uint8_t DM_App_Optic_Check_StickPresent_WithValue(uint16_t* pADC)
+{
+    uint16_t wADC = DM_App_Optic_Measure(OPTIC_CH_3);
+
+    if (pADC != 0)
+    {
+        *pADC = wADC;
+    }
+
+    return (wADC < OPTIC_STICK_REMOVE_THRESHOLD) ? 0 : 1;
+}
+
+/**
   * @brief  Immediately measures OPTIC_CH_3 (innermost sensor, LED1) at Duty 100%
   *         and judges whether the stick is physically present.
   * @param  None
   * @retval uint8_t: 1 if stick present, 0 if removed.
   */
-
 uint8_t DM_App_Optic_Check_StickPresent(void)
 {
-    uint16_t wADC = DM_App_Optic_Measure(OPTIC_CH_3);
+    uint16_t wUnused;
 
-    return (wADC < OPTIC_STICK_REMOVE_THRESHOLD) ? 0 : 1;
+    /* 판정식을 두 번 적지 않으려고 _WithValue() 에 위임한다.
+       문턱값을 고칠 자리가 한 곳으로 유지된다. (2026-10-21) */
+    return DM_App_Optic_Check_StickPresent_WithValue(&wUnused);
 }
 
 /**

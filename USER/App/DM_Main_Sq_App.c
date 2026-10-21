@@ -158,6 +158,10 @@ static void DM_App_Main_Sq_Idle_Step_Handler(void)
 {
     //uint8_t i;
   
+#if !_DEBUG_LCD_SEQ_ONLY
+    uint16_t wGateADC = 0;   /* 깨운 직후 관문이 판정에 쓴 CH3 원본값 */
+#endif
+
     DM_App_LCD_SetState(CH_LCD_ALL, LCD_STATE_OFF);
     DM_HW_Drv_SystemSleep_10ms();
 
@@ -187,7 +191,7 @@ static void DM_App_Main_Sq_Idle_Step_Handler(void)
     DM_App_LCD_Sq_Set_Step(LCD_SQ_STICK_INSERT);
     DM_App_Main_Sq_Set_Step(MAIN_SQ_STICK_INSERT);
 #else
-    if (DM_App_Optic_Check_StickPresent())
+    if (DM_App_Optic_Check_StickPresent_WithValue(&wGateADC))
     {
         /* Transition to Stick Insert Step */
         DM_App_LCD_Sq_Set_Step(LCD_SQ_STICK_INSERT);
@@ -198,6 +202,13 @@ static void DM_App_Main_Sq_Idle_Step_Handler(void)
         /* Spurious wake or stick pulled back out immediately: stay in IDLE
            so the next call to DM_App_Main_Sq_Process() re-enters this
            handler and goes back to Halt mode. */
+
+        /* 다시 잠들기 전에 이 회차의 CH3 원본값을 EEPROM 에 남긴다.
+           여기를 지나간 사실은 레코드에 전혀 남지 않아(검사가 시작되지 않으므로)
+           사후에 원인을 가릴 수단이 없었다. 7·9번 기기가 이 경로로 빠진 것을
+           알아내는 데 디버거와 반나절이 들었다. (2026-10-21) */
+        DM_App_Rom_Update_WakeFail(wGateADC);
+
         DM_App_Main_Sq_Set_Step(MAIN_SQ_IDLE);
     }
 #endif
@@ -871,6 +882,18 @@ void DM_App_Main_Sq_Send_RawDump(void)
         {
             DM_HW_Drv_USART_SendWord(awResultRec[j]);
         }
+    }
+
+    /* 4. 깨운 직후 광학 관문을 통과하지 못한 회차의 CH3 원본값 범위 (2 words)
+          맨 뒤에 붙인다. 앞쪽 바이트 위치가 그대로라 PC 파서는 "끝에 두 값이
+          더 온다"만 추가하면 된다. 269 -> 273 바이트. */
+    {
+        uint16_t wFailMin = 0;
+        uint16_t wFailMax = 0;
+
+        DM_App_Rom_Get_WakeFail(&wFailMin, &wFailMax);
+        DM_HW_Drv_USART_SendWord(wFailMin);
+        DM_HW_Drv_USART_SendWord(wFailMax);
     }
 }
 

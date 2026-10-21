@@ -119,6 +119,19 @@ uint8_t DM_App_Optic_CalcEmptyPTR(const uint16_t* pInitBuffer, uint16_t* pBuffer
 uint8_t DM_App_Optic_Check_StickPresent(void);
 
 /**
+  * @brief  Same as DM_App_Optic_Check_StickPresent(), but also hands back the
+  *         raw CH3 reading it judged on.
+  * @note   DM_App_Optic_Check_StickPresent() delegates to this one, so the
+  *         threshold comparison lives in exactly one place.
+  *         Added for the post-wake-up gate, which records the reading of a
+  *         failed gate to EEPROM for later diagnosis. Measuring again outside
+  *         would cost one more LED burst on a coin cell.
+  * @param  pADC: Receives the raw (pre-gain) CH3 reading. May be NULL.
+  * @retval uint8_t: 1 if stick present, 0 if removed.
+  */
+uint8_t DM_App_Optic_Check_StickPresent_WithValue(uint16_t* pADC);
+
+/**
   * @brief  DM_App_Optic_Check_StickPresent()의 배율 적용판.
   * @note   배율이 계산된 뒤에만 부를 것. 배율이 0이면 항상 "빠짐"으로 나온다.
   *         대기 루프처럼 시료가 들어온 뒤에도 판정해야 하는 구간에서 쓴다.

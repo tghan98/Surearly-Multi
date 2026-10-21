@@ -33,6 +33,15 @@
    초기화되므로 그 시점에 최신 위치를 잘못 짚는다. 별도로 적어둔다. (2026-10-19) */
 #define ROM_OFFS_DUMP_POS               244 /**< Offset for latest result slot (1 Byte) */
 
+/* 깨운 직후 광학 관문(DM_Main_Sq_App.c)을 통과하지 못한 회차의 CH3 원본값 범위.
+   248 부터 시작하는 이유 - STM8L 의 EEPROM 은 1바이트만 써도 물리적으로 4바이트
+   블록이 함께 소모된다. 245 에서 시작하면 244번(ROM_OFFS_DUMP_POS)과 같은 블록
+   (244~247)을 공유하여, 이 값을 갱신할 때마다 덤프 위치 칸도 함께 닳는다.
+   덤프 위치가 망가지면 레코드가 최신순으로 나오지 않는다. (2026-10-21) */
+#define ROM_OFFS_WAKE_FAIL_MIN          248 /**< Offset for wake-gate fail min (2 Byte) */
+#define ROM_OFFS_WAKE_FAIL_MAX          250 /**< Offset for wake-gate fail max (2 Byte) */
+/* 252 ~ 255 는 비워 둔다. 다음 4바이트 블록을 깨끗하게 남긴다. */
+
 /* Functions -----------------------------------------------------------------*/
 
 /**
@@ -231,6 +240,62 @@ uint8_t DM_App_Rom_Get_DumpPos(void)
 void DM_App_Rom_Set_DumpPos(uint8_t bPos)
 {
     DM_HW_Drv_EEPROM_Write(ROM_OFFS_DUMP_POS, &bPos, 1);
+}
+
+/**
+  * @brief  Reads the wake-gate fail reading range (min, max) from EEPROM.
+  * @note   Factory-fresh EEPROM reads 0xFFFF everywhere. That is already the
+  *         value min must start from, but max must start from 0 - otherwise
+  *         (reading > max) is false forever and max never updates.
+  *         So the factory state is normalised here, on read, and written back,
+  *         the same way DM_App_Rom_Get_StickPtrData() does it.
+  * @param  pMin: Receives the lowest reading seen. 0xFFFF means none recorded.
+  * @param  pMax: Receives the highest reading seen. 0 means none recorded.
+  * @retval None
+  */
+void DM_App_Rom_Get_WakeFail(uint16_t* pMin, uint16_t* pMax)
+{
+    uint16_t wMin = 0;
+    uint16_t wMax = 0;
+
+    DM_HW_Drv_EEPROM_Read(ROM_OFFS_WAKE_FAIL_MIN, (uint8_t*)&wMin, 2);
+    DM_HW_Drv_EEPROM_Read(ROM_OFFS_WAKE_FAIL_MAX, (uint8_t*)&wMax, 2);
+
+    /* Guard-rail: Initial state check (0xFFFF) */
+    if ((wMin == 0xFFFF) && (wMax == 0xFFFF))
+    {
+        wMax = 0;
+        DM_HW_Drv_EEPROM_Write(ROM_OFFS_WAKE_FAIL_MAX, (uint8_t*)&wMax, 2);
+    }
+
+    *pMin = wMin;
+    *pMax = wMax;
+}
+
+/**
+  * @brief  Widens the stored wake-gate fail range with one new reading.
+  * @note   Writes only when the range actually widens. A run of identical
+  *         readings therefore costs one write, not one per wake-up - which is
+  *         why a reading range is stored here instead of an occurrence count.
+  * @param  wADC: Raw CH3 reading taken when the post-wake-up gate failed.
+  * @retval None
+  */
+void DM_App_Rom_Update_WakeFail(uint16_t wADC)
+{
+    uint16_t wMin = 0;
+    uint16_t wMax = 0;
+
+    DM_App_Rom_Get_WakeFail(&wMin, &wMax);
+
+    if (wADC < wMin)
+    {
+        DM_HW_Drv_EEPROM_Write(ROM_OFFS_WAKE_FAIL_MIN, (uint8_t*)&wADC, 2);
+    }
+
+    if (wADC > wMax)
+    {
+        DM_HW_Drv_EEPROM_Write(ROM_OFFS_WAKE_FAIL_MAX, (uint8_t*)&wADC, 2);
+    }
 }
 
 /**

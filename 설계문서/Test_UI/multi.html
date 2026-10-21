@@ -278,7 +278,7 @@
       <button id="btnExportPdf" class="btn-select" disabled>PDF로 출력</button>
     </div>
     <div class="dump-result" id="rawDumpResult"></div>
-    <div class="notice">리셋: <code>'R'</code>/<code>'r'</code> + Enter → EEPROM/RAM의 TestCompleteCount 초기화. RawDump: <code>'M'</code>/<code>'m'</code> + Enter → 헤더(21B)+상태(8B)+초기스틱(16B)+레코드7개(224B) = 총 269바이트 응답을 자동 파싱합니다.</div>
+    <div class="notice">리셋: <code>'R'</code>/<code>'r'</code> + Enter → EEPROM/RAM의 TestCompleteCount 초기화. RawDump: <code>'M'</code>/<code>'m'</code> + Enter → 헤더(21B)+상태(8B)+초기스틱(16B)+레코드7개(224B)+헛깨어남범위(4B) = 총 273바이트 응답을 자동 파싱합니다. 레코드는 최신순으로 옵니다.</div>
   </div>
 
   <div class="panel">
@@ -326,8 +326,10 @@
   }
   const rawDumpResultEl = document.getElementById('rawDumpResult');
 
-  // RawDump format per EEPROM_UART.md §2-4/§2-5: header 21 + state 8 + initial stick 16 + 7 records x 32 = 269B
-  const RAWDUMP_TOTAL_BYTES = 21 + 8 + 16 + (7 * 32);
+  // RawDump format per EEPROM_UART.md §2-4/§2-5:
+  //   header 21 + state 8 + initial stick 16 + 7 records x 32 + wake-fail range 4 = 273B
+  // 맨 뒤 4바이트는 2026-10-21 추가. 앞쪽 바이트 위치는 그대로다.
+  const RAWDUMP_TOTAL_BYTES = 21 + 8 + 16 + (7 * 32) + 4;
   let rawDumpActive = false;
   let rawDumpBuffer = [];
   let lastRawDumpData = null;
@@ -361,6 +363,7 @@
     return {
       firmwareVer: '', realFirmwareVer: '', lotUpper: '', lotLower: '',
       insertCount: EMPTY_VALUE, testCompleteCount: EMPTY_VALUE, errorStep: EMPTY_VALUE, errorCode: null,
+      wakeFailMin: EMPTY_VALUE, wakeFailMax: EMPTY_VALUE,
       initialStick: STICK_BANDS.map(band => ({ band, value: EMPTY_VALUE })),
       records: Array.from({ length: 7 }, (_, slot) => ({
         slot,
@@ -636,7 +639,25 @@
       records.push({ slot, gain, emptyBand, resultBand, calc, errorStep: recErrStep, errorCode: recErrCode });
     }
 
-    return { firmwareVer, realFirmwareVer, lotUpper, lotLower, insertCount, testCompleteCount, errorStep, errorCode, initialStick, records };
+    // 깨운 직후 광학 관문을 통과하지 못한 회차의 CH3 원본값 범위 (2026-10-21 추가)
+    const wakeFailMin = readWord();
+    const wakeFailMax = readWord();
+
+    return { firmwareVer, realFirmwareVer, lotUpper, lotLower, insertCount, testCompleteCount, errorStep, errorCode, initialStick, records, wakeFailMin, wakeFailMax };
+  }
+
+  // 깨운 직후 광학 관문을 통과하지 못한 회차의 CH3 원본값 범위를 사람 말로 옮긴다.
+  // 펌웨어는 이 값을 해석하지 않는다. 기준이 아직 없기 때문이다. (2026-10-21)
+  function describeWakeFail(min, max) {
+    if (typeof min !== 'number' || typeof max !== 'number') {
+      return 'Wake Fail: SW1으로 깨어났으나 광학 관문(CH3 원본값 ≥ 2600)을 통과하지 못한 회차의 측정값 범위';
+    }
+    if (min === 0xFFFF && max === 0) return 'Wake Fail: 기록된 관문 실패값 없음';
+    if (min > max) return 'Wake Fail: ⚠ 깨진 기록 — 쓰기 중 전원이 끊긴 흔적일 수 있음. 믿지 말 것';
+    if (min === 0) return 'Wake Fail: 0 포함 — ADC timeout 또는 실제 입력 0 (구별 불가)';
+    if (max < 100) return 'Wake Fail: 광학 신호가 암전류 수준 — 광학계 확인 필요';
+    if (max - min < 200) return 'Wake Fail: 좁은 범위 — 스틱 없이 깨어남(노이즈)으로 보임';
+    return 'Wake Fail: 넓은 범위 — 스틱이 어중간하게 물렸을 가능성';
   }
 
   function isOutOfRange(value, range) {
@@ -656,7 +677,10 @@
   }
 
   function buildRawDumpTablesHtml(d) {
-    const latestSlot = typeof d.insertCount === 'number' ? ((d.insertCount - 1) % 7 + 7) % 7 : -1;
+    // 2026-10-19 펌웨어 변경으로 레코드가 최신순으로 전송된다. 따라서 표의 첫 줄이
+    // 항상 최신이며, 삽입 횟수로 칸 번호를 역산할 필요가 없다. (이전에는 역산한
+    // 탓에 엉뚱한 줄에 색이 칠해졌다.) 변수명은 "표에서 강조할 줄"의 뜻이다.
+    const latestSlot = 0;
 
     const stickHeaderCells = d.initialStick.map(s => `<th>${s.band}</th>`).join('');
     const stickValueCells = d.initialStick.map(s => `
@@ -714,6 +738,14 @@
         </table>
       </div>
 
+      <div class="range-note">${describeWakeFail(d.wakeFailMin, d.wakeFailMax)}</div>
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>필드</th><th>Wake Fail Min</th><th>Wake Fail Max</th></tr></thead>
+          <tbody><tr><td>데이터(Value)</td><td>${d.wakeFailMin}</td><td>${d.wakeFailMax}</td></tr></tbody>
+        </table>
+      </div>
+
       <div class="table-scroll">
         <table>
           <thead>
@@ -753,6 +785,9 @@
     rows.push([]);
     rows.push(['필드', ...d.initialStick.map(s => s.band)]);
     rows.push(['데이터(Value)', ...d.initialStick.map(s => s.value)]);
+    rows.push([]);
+    rows.push(['필드', 'Wake Fail Min', 'Wake Fail Max']);
+    rows.push(['데이터(Value)', d.wakeFailMin, d.wakeFailMax]);
     rows.push([]);
     rows.push(['필드', 'Gain CH1', 'Gain CH2', 'Gain CH3', 'Gain CH4', 'ET', 'EBT', 'EBC', 'EC', 'RT', 'RBT', 'RBC', 'RC', 'T Intensity', 'C Intensity', 'Yes(1)/No(0)', 'Error Step', 'Error Code']);
     d.records.forEach((r, i) => {

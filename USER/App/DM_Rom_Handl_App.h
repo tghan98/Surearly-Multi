@@ -97,6 +97,24 @@ void DM_App_Rom_Get_StickPtrData(uint16_t* pBuffer);
 void DM_App_Rom_Set_StickPtrData(const uint16_t* pBuffer);
 
 /**
+  * @brief  Reads the wake-gate fail reading range (min, max) from EEPROM.
+  * @note   Normalises the factory-fresh state (both 0xFFFF) on read: max is set
+  *         to 0 and written back, otherwise it could never update.
+  * @param  pMin: Receives the lowest reading seen. 0xFFFF means none recorded.
+  * @param  pMax: Receives the highest reading seen. 0 means none recorded.
+  * @retval None
+  */
+void DM_App_Rom_Get_WakeFail(uint16_t* pMin, uint16_t* pMax);
+
+/**
+  * @brief  Widens the stored wake-gate fail range with one new reading.
+  * @note   Writes only when the range actually widens.
+  * @param  wADC: Raw CH3 reading taken when the post-wake-up gate failed.
+  * @retval None
+  */
+void DM_App_Rom_Update_WakeFail(uint16_t wADC);
+
+/**
   * @brief  Reads 16 result data (short) from a specific channel.
   * @param  bChannel: Channel index (0 ~ 6).
   * @param  pBuffer: Pointer to uint16_t array (size 16) to store data.
