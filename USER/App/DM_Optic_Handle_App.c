@@ -10,7 +10,6 @@
 /* Includes ------------------------------------------------------------------*/
 #include "DM_Optic_Handle_App.h"
 #include "DM_HW_Drv.h"
-#include "DM_Rom_Handl_App.h"
 #include "DM_Utill.h"
 
 #include "Parameter_define.h"
@@ -157,10 +156,9 @@ void DM_App_Optic_ResetGain(void)
 
 /**
   * @brief  Measures initial PTR values for all 4 optic channels at 100% drive.
-  * @note   Each channel's raw reading is validated against OPTIC_INITIAL_MIN/MAX_100.
+  * @note   Presence is checked before each channel and once after all four.
   * @param  pBuffer: Pointer to uint16_t array (size 8) to store measurements.
-  * @retval uint8_t: OPTIC_SUCCESS, OPTIC_ERR_STICK_REMOVED, or FAIL_OPTIC_CH0..CH3
-  *         if a channel's reading is out of the expected range.
+  * @retval uint8_t: OPTIC_SUCCESS or OPTIC_ERR_STICK_REMOVED.
   */
 uint8_t DM_App_Optic_MeasureInitialStick(uint16_t* pBuffer)
 {
@@ -185,23 +183,29 @@ uint8_t DM_App_Optic_MeasureInitialStick(uint16_t* pBuffer)
 
         pBuffer[bCh] = DM_App_Optic_Measure((OPTIC_CH_t)bCh);
 
-        /* Raw (pre-gain) scale: after gain every channel lands near the target,
-           which would make this range check meaningless. */
-        if ((pBuffer[bCh] < OPTIC_INITIAL_MIN_100) || (pBuffer[bCh] > OPTIC_INITIAL_MAX_100))
-        {
-            return (uint8_t)(FAIL_OPTIC_CH0 + bCh);
-        }
     }
     
-    /* Final Check before EEPROM write */
+    /* Caller stores only a complete set after this final presence check. */
     if (!DM_App_Optic_Check_StickPresent())
     {
         return OPTIC_ERR_STICK_REMOVED;
     }
 
-    /* Backup the entire set to EEPROM */
-    DM_App_Rom_Set_StickPtrData(pBuffer);
-    
+    return OPTIC_SUCCESS;
+}
+
+uint8_t DM_App_Optic_CheckInitialRange(const uint16_t* pBuffer)
+{
+    uint8_t bCh;
+
+    for (bCh = 0; bCh < (uint8_t)OPTIC_CH_MAX; bCh++)
+    {
+        if ((pBuffer[bCh] < OPTIC_INITIAL_MIN_100) ||
+            (pBuffer[bCh] > OPTIC_INITIAL_MAX_100))
+        {
+            return (uint8_t)(FAIL_OPTIC_CH0 + bCh);
+        }
+    }
     return OPTIC_SUCCESS;
 }
 

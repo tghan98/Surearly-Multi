@@ -19,6 +19,7 @@
 /* Private Variables ---------------------------------------------------------*/
 static MAIN_SQ_STEP_t gs_tMain_Sq_Step = MAIN_SQ_IDLE;
 static uint16_t gs_wMain_Sq_Timer = 0;
+static uint8_t gs_bQcCycle = 0;
 
 /* Global variables for measurement and tracking */
 static uint8_t gs_bTestCompleteCount = 0;
@@ -33,6 +34,7 @@ static uint16_t gs_awResult[RES_MAX];
 
 /* Private Function Prototypes -----------------------------------------------*/
 static void DM_App_Main_Sq_Enter_Error(uint8_t bErrCode, LCD_SQ_STEP_t tLcdErrStep);
+static void DM_App_Main_Sq_Initial_Optic_Error(uint8_t bErrCode, LCD_SQ_STEP_t tLcdErrStep);
 static void DM_App_Main_Sq_Idle_Step_Handler(void);
 static void DM_App_Main_Sq_Stick_Insert_Step_Handler(void);
 static void DM_App_Main_Sq_Sample_Load_Wait_Step_Handler(void);
@@ -123,6 +125,23 @@ static void DM_App_Main_Sq_Enter_Error(uint8_t bErrCode, LCD_SQ_STEP_t tLcdErrSt
     gs_wMain_Sq_Timer = ERR_RUN_TIME;
 }
 
+static void DM_App_Main_Sq_Initial_Optic_Error(uint8_t bErrCode, LCD_SQ_STEP_t tLcdErrStep)
+{
+    if (gs_bQcCycle)
+    {
+        DM_App_Main_Sq_Enter_Error(bErrCode, tLcdErrStep);
+    }
+    else
+    {
+        gs_bErrorCode = bErrCode;
+        gs_bErrorSequence = gs_tMain_Sq_Step;
+        DM_App_Rom_Set_ErrorCode(gs_bErrorCode);
+        DM_App_Rom_Set_ErrorStep(gs_bErrorSequence);
+        DM_App_Main_Sq_Save_Result_To_Rom();
+        DM_App_Main_Sq_Set_Step(MAIN_SQ_IDLE);
+    }
+}
+
 /**
   * @brief  Sleeps for 250ms (25 x 10ms) while checking stick presence,
   *         entering an error state and returning 1 if the stick is removed.
@@ -155,11 +174,9 @@ static uint8_t DM_App_Main_Sq_Sleep_And_CheckStick_250ms(uint8_t bErrCode, LCD_S
   */
 static void DM_App_Main_Sq_Idle_Step_Handler(void)
 {
-    //uint8_t i;
-  
 #if !_DEBUG_LCD_SEQ_ONLY
     uint16_t wGateADC = 0;   /* 깨운 직후 관문이 판정에 쓴 CH3 원본값 */
-    uint8_t bStickInsertCnt;
+    uint8_t bStickInsertCnt, i;
 #endif
 
     DM_App_LCD_SetState(CH_LCD_ALL, LCD_STATE_OFF);
@@ -191,32 +208,46 @@ static void DM_App_Main_Sq_Idle_Step_Handler(void)
     DM_App_LCD_Sq_Set_Step(LCD_SQ_STICK_INSERT);
     DM_App_Main_Sq_Set_Step(MAIN_SQ_STICK_INSERT);
 #else
+    DM_App_Optic_ResetGain();
+    DM_App_Stick_Reset_Status();
+    gs_bErrorCode = 0;
+    gs_bErrorSequence = 0;
+    for (i = 0; i < BAND_MAX; i++)
+    {
+        gs_awEmptyBand_LowData[i] = 0;
+        gs_awResultBand_LowData[i] = 0;
+    }
+    for (i = 0; i < RES_MAX; i++)
+    {
+        gs_awResult[i] = 0;
+    }
+
+    bStickInsertCnt = DM_App_Rom_Get_InsertCount();
     if (DM_App_Optic_Check_StickPresent_WithValue(&wGateADC))
     {
-        bStickInsertCnt = DM_App_Rom_Get_InsertCount();
         if (bStickInsertCnt < 254)
         {
             bStickInsertCnt++;
             DM_App_Rom_Set_InsertCount(bStickInsertCnt);
         }
+        gs_bQcCycle = (bStickInsertCnt <= 5);
 
         /* Transition to Stick Insert Step */
-        DM_App_LCD_Sq_Set_Step(LCD_SQ_STICK_INSERT);
         DM_App_Main_Sq_Set_Step(MAIN_SQ_STICK_INSERT);
     }
     else
     {
-        /* Spurious wake or stick pulled back out immediately: stay in IDLE
-           so the next call to DM_App_Main_Sq_Process() re-enters this
-           handler and goes back to Halt mode. */
-
-        /* 다시 잠들기 전에 이 회차의 CH3 원본값을 EEPROM 에 남긴다.
-           여기를 지나간 사실은 레코드에 전혀 남지 않아(검사가 시작되지 않으므로)
-           사후에 원인을 가릴 수단이 없었다. 7·9번 기기가 이 경로로 빠진 것을
-           알아내는 데 디버거와 반나절이 들었다. (2026-10-21) */
+        /* Preserve the failed CH3 reading before QC error display or silent IDLE. */
         DM_App_Rom_Update_WakeFail(wGateADC);
-
-        DM_App_Main_Sq_Set_Step(MAIN_SQ_IDLE);
+        gs_bQcCycle = (bStickInsertCnt < 5);
+        if (gs_bQcCycle)
+        {
+            DM_App_Main_Sq_Enter_Error(ERROR_STICK_FAIL, LCD_SQ_ERR_STICK_FAIL);
+        }
+        else
+        {
+            DM_App_Main_Sq_Set_Step(MAIN_SQ_IDLE);
+        }
     }
 #endif
 }
@@ -241,23 +272,6 @@ static void DM_App_Main_Sq_Stick_Insert_Step_Handler(void)
     DM_App_Main_Sq_Set_Step(MAIN_SQ_SAMPLE_LOAD_WAIT);
 #else
     uint8_t bResult;
-    static uint8_t i;
-
-    /* 0. Reset stale measurement/result data from the previous cycle so an
-       early failure below doesn't save leftover data from a prior test to ROM. */
-    DM_App_Optic_ResetGain();
-    DM_App_Stick_Reset_Status();   /* 이전 회차의 스틱 판정 캐시도 함께 지운다 (2026-10-19) */
-    gs_bErrorCode = 0;
-    gs_bErrorSequence = 0;
-    for (i = 0; i < BAND_MAX; i++)
-    {
-        gs_awEmptyBand_LowData[i]  = 0;
-        gs_awResultBand_LowData[i] = 0;
-    }
-    for (i = 0; i < RES_MAX; i++)
-    {
-        gs_awResult[i] = 0;
-    }
 
     /* Read completed-test count; insertion was counted after the IDLE gate. */
     gs_bTestCompleteCount = DM_App_Rom_Get_TestCompleteCount();
@@ -273,13 +287,20 @@ static void DM_App_Main_Sq_Stick_Insert_Step_Handler(void)
     bResult = DM_App_Optic_MeasureInitialStick(gs_awInitialStickPtr);
     if (bResult == OPTIC_ERR_STICK_REMOVED)
     {
-        DM_App_Main_Sq_Enter_Error(ERROR_STICK_REMOVE, LCD_SQ_ERR_STICK_REMOVE);
+        DM_App_Main_Sq_Initial_Optic_Error(ERROR_STICK_REMOVE, LCD_SQ_ERR_STICK_REMOVE);
         return;
     }
-    else if (bResult != OPTIC_SUCCESS)
+
+    if (gs_bQcCycle)
     {
-        /* Store error code (bResult) for out-of-range initial channel readings */
-        DM_App_Main_Sq_Enter_Error(bResult, LCD_SQ_ERR_STICK_FAIL);
+        DM_App_Rom_Set_QcReference(gs_awInitialStickPtr);
+    }
+    DM_App_Rom_Set_StickPtrData(gs_awInitialStickPtr);
+
+    bResult = DM_App_Optic_CheckInitialRange(gs_awInitialStickPtr);
+    if (bResult != OPTIC_SUCCESS)
+    {
+        DM_App_Main_Sq_Initial_Optic_Error(bResult, LCD_SQ_ERR_STICK_FAIL);
         return;
     }
 
@@ -287,13 +308,13 @@ static void DM_App_Main_Sq_Stick_Insert_Step_Handler(void)
     bResult = DM_App_Optic_TuneTargetADC(gs_awInitialStickPtr, _nTAGET_LIGHT);
     if (bResult == OPTIC_ERR_STICK_REMOVED)
     {
-        DM_App_Main_Sq_Enter_Error(ERROR_STICK_REMOVE, LCD_SQ_ERR_STICK_REMOVE);
+        DM_App_Main_Sq_Initial_Optic_Error(ERROR_STICK_REMOVE, LCD_SQ_ERR_STICK_REMOVE);
         return;
     }
     else if (bResult != OPTIC_SUCCESS)
     {
         /* Store error code (bResult) for other tuning failures */
-        DM_App_Main_Sq_Enter_Error(bResult, LCD_SQ_ERR_STICK_FAIL);
+        DM_App_Main_Sq_Initial_Optic_Error(bResult, LCD_SQ_ERR_STICK_FAIL);
         return;
     }
     
@@ -301,9 +322,11 @@ static void DM_App_Main_Sq_Stick_Insert_Step_Handler(void)
     bResult = DM_App_Optic_CalcEmptyPTR(gs_awInitialStickPtr, gs_awEmptyBand_LowData);
     if (bResult != OPTIC_SUCCESS)
     {
-        DM_App_Main_Sq_Enter_Error(bResult, LCD_SQ_ERR_STICK_FAIL);
+        DM_App_Main_Sq_Initial_Optic_Error(bResult, LCD_SQ_ERR_STICK_FAIL);
         return;
     }
+
+    DM_App_LCD_Sq_Set_Step(LCD_SQ_STICK_INSERT);
 
     /* 6. Wait for LCD_SQ_STICK_INSERT animation to finish (LCD_SQ_IDLE) before transitioning */
     while (DM_App_LCD_Sq_Get_Step() != LCD_SQ_IDLE)
@@ -774,8 +797,9 @@ static void DM_App_Main_Sq_Result_Out_Step_Handler(void)
   */
 static void DM_App_Main_Sq_Error_Wait_Step_Handler(void)
 {
-    /* 1. First entry to Error Wait: Save Error Code and Step to EEPROM */
-    if (gs_wMain_Sq_Timer == ERR_RUN_TIME)
+    /* IDLE gate failures are recorded by WakeFail, not result slots. */
+    if ((gs_wMain_Sq_Timer == ERR_RUN_TIME) &&
+        (gs_bErrorSequence != MAIN_SQ_IDLE))
     {
         DM_App_Rom_Set_ErrorCode(gs_bErrorCode);
         DM_App_Rom_Set_ErrorStep(gs_bErrorSequence);

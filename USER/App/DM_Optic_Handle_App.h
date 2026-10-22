@@ -80,10 +80,12 @@ void DM_App_Optic_ResetGain(void);
   * @param  pBuffer: Pointer to uint16_t array (size 8); entries 0~3 receive the
   *         per-channel readings and 4~7 are zero-filled to keep the EEPROM
   *         layout unchanged.
-  * @retval uint8_t: OPTIC_SUCCESS, OPTIC_ERR_STICK_REMOVED, or FAIL_OPTIC_CH0..CH3
-  *         if a channel's reading is out of the expected range.
+  * @retval uint8_t: OPTIC_SUCCESS or OPTIC_ERR_STICK_REMOVED.
   */
 uint8_t DM_App_Optic_MeasureInitialStick(uint16_t* pBuffer);
+
+/** Checks all four raw readings after the complete set has been collected. */
+uint8_t DM_App_Optic_CheckInitialRange(const uint16_t* pBuffer);
 
 /**
   * @brief  Computes each channel's gain from the initial readings.
