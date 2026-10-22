@@ -21,8 +21,6 @@ static MAIN_SQ_STEP_t gs_tMain_Sq_Step = MAIN_SQ_IDLE;
 static uint16_t gs_wMain_Sq_Timer = 0;
 
 /* Global variables for measurement and tracking */
-static uint8_t gs_bStickInsertCnt = 0;
-
 static uint8_t gs_bTestCompleteCount = 0;
 static uint8_t gs_bErrorCode = 0;
 static uint8_t gs_bErrorSequence = 0;
@@ -161,6 +159,7 @@ static void DM_App_Main_Sq_Idle_Step_Handler(void)
   
 #if !_DEBUG_LCD_SEQ_ONLY
     uint16_t wGateADC = 0;   /* 깨운 직후 관문이 판정에 쓴 CH3 원본값 */
+    uint8_t bStickInsertCnt;
 #endif
 
     DM_App_LCD_SetState(CH_LCD_ALL, LCD_STATE_OFF);
@@ -194,6 +193,13 @@ static void DM_App_Main_Sq_Idle_Step_Handler(void)
 #else
     if (DM_App_Optic_Check_StickPresent_WithValue(&wGateADC))
     {
+        bStickInsertCnt = DM_App_Rom_Get_InsertCount();
+        if (bStickInsertCnt < 254)
+        {
+            bStickInsertCnt++;
+            DM_App_Rom_Set_InsertCount(bStickInsertCnt);
+        }
+
         /* Transition to Stick Insert Step */
         DM_App_LCD_Sq_Set_Step(LCD_SQ_STICK_INSERT);
         DM_App_Main_Sq_Set_Step(MAIN_SQ_STICK_INSERT);
@@ -253,13 +259,8 @@ static void DM_App_Main_Sq_Stick_Insert_Step_Handler(void)
         gs_awResult[i] = 0;
     }
 
-    /* 1. Read gs_bStickInsertCnt and gs_bTestCompleteCount from EEPROM */
-    gs_bStickInsertCnt = DM_App_Rom_Get_InsertCount();
+    /* Read completed-test count; insertion was counted after the IDLE gate. */
     gs_bTestCompleteCount = DM_App_Rom_Get_TestCompleteCount();
-
-    /* 2. Increment gs_bStickInsertCnt */
-    gs_bStickInsertCnt++;
-    DM_App_Rom_Set_InsertCount(gs_bStickInsertCnt);
 
     /* Check if the device usage count exceeds _nSCAN_MAX_CNT */
     if (gs_bTestCompleteCount >= _nSCAN_MAX_CNT)
