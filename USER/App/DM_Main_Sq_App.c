@@ -14,6 +14,7 @@
 #include "DM_HW_Drv.h"
 #include "DM_Utill.h"
 #include "User_Main.h"
+#include "stm8l15x_wwdg.h"
 
 /* Private Variables ---------------------------------------------------------*/
 static MAIN_SQ_STEP_t gs_tMain_Sq_Step = MAIN_SQ_IDLE;
@@ -450,11 +451,7 @@ static void DM_App_Main_Sq_Sample_Load_Wait_Step_Handler(void)
     DM_App_Rom_Set_ErrorCode(gs_bErrorCode);
     DM_App_Rom_Set_ErrorStep(gs_bErrorSequence);
 
-    /* Save measurement data to ROM (Index: Insert Count - 1, if > 0) */
-    {
-        uint8_t bSaveIndex = (gs_bStickInsertCnt > 0) ? (gs_bStickInsertCnt - 1) : 0;
-        DM_App_Main_Sq_Save_Result_To_Rom(bSaveIndex);
-    }
+    DM_App_Main_Sq_Save_Result_To_Rom();
 
     /* Transition to IDLE which enters Halt Mode (Sleep) */
     DM_App_Main_Sq_Set_Step(MAIN_SQ_IDLE);
@@ -696,10 +693,9 @@ static void DM_App_Main_Sq_Result_Scan_Step_Handler(void)
   *         - ResultBandData: 8 bytes
   *         - FinalResults: 6 bytes
   *         - Dummy: 2 bytes
-  * @param  bSaveIndex: Target storage index (0 ~ 6).
   * @retval None
   */
-void DM_App_Main_Sq_Save_Result_To_Rom(uint8_t bSaveIndex)
+void DM_App_Main_Sq_Save_Result_To_Rom(void)
 {
     uint16_t awRomBuffer[16];
     static uint8_t i, idx;
@@ -733,8 +729,8 @@ void DM_App_Main_Sq_Save_Result_To_Rom(uint8_t bSaveIndex)
     /* 5. Pack the current error step in the high byte and error code in the low byte. */
     awRomBuffer[idx++] = (uint16_t)(((uint16_t)gs_bErrorSequence << 8) | gs_bErrorCode);
 
-    /* 6. Save to ROM using index */
-    DM_App_Rom_Save_CurrentResult(bSaveIndex, awRomBuffer);
+    /* 6. Save to the next slot; ring position is independent of Insert Count. */
+    DM_App_Rom_Save_NextResult(awRomBuffer);
 }
 
 /**
@@ -752,17 +748,12 @@ static void DM_App_Main_Sq_Result_Out_Step_Handler(void)
         DM_HW_Drv_SystemSleep_10ms();
     }
 #else
-    uint8_t bSaveIndex;
-
     /* 1. Increment Test Complete Count and Save to EEPROM */
     gs_bTestCompleteCount++;
     DM_App_Rom_Set_TestCompleteCount(gs_bTestCompleteCount);
 
-    /* 2. Calculate Save Index (Insert Count - 1, if > 0) */
-    bSaveIndex = (gs_bStickInsertCnt > 0) ? (gs_bStickInsertCnt - 1) : 0;
-
-    /* 3. Save all measurement and calculation data to ROM */
-    DM_App_Main_Sq_Save_Result_To_Rom(bSaveIndex);
+    /* 2. Save all measurement and calculation data to ROM. */
+    DM_App_Main_Sq_Save_Result_To_Rom();
 
     /* 4. Wait for 5 minutes (Animation / Visibility) */
     for (i = 0; i < RESULT_OUT_WAIT_TIME; i++)
@@ -782,19 +773,14 @@ static void DM_App_Main_Sq_Result_Out_Step_Handler(void)
   */
 static void DM_App_Main_Sq_Error_Wait_Step_Handler(void)
 {
-    uint8_t bSaveIndex;
-
     /* 1. First entry to Error Wait: Save Error Code and Step to EEPROM */
     if (gs_wMain_Sq_Timer == ERR_RUN_TIME)
     {
         DM_App_Rom_Set_ErrorCode(gs_bErrorCode);
         DM_App_Rom_Set_ErrorStep(gs_bErrorSequence);
 
-        /* Calculate Save Index (Insert Count - 1, if > 0) */
-        bSaveIndex = (gs_bStickInsertCnt > 0) ? (gs_bStickInsertCnt - 1) : 0;
-
         /* Save measurement data at the time of error for diagnostics */
-        DM_App_Main_Sq_Save_Result_To_Rom(bSaveIndex);
+        DM_App_Main_Sq_Save_Result_To_Rom();
     }
 
     /* 2. Run Wait Timer (2 minutes Animation/Delay) */
@@ -869,13 +855,17 @@ void DM_App_Main_Sq_Send_RawDump(void)
         DM_HW_Drv_USART_SendWord(gs_awInitialStickPtr[i]);
     }
 
-    /* 3. All 7 stored result records (16 words each, including dummy)
-          최신 레코드부터 과거 순으로 보낸다. 링버퍼라 칸 번호 자체는 시간순이
-          아니므로, 마지막으로 저장한 칸을 시작점으로 삼아 거꾸로 돈다. */
+    /* 3. Stage-1 wire compatibility: six real result records plus one zero
+          record, keeping the existing 273-byte packet until stage 4.
+          Real records are sent newest first. */
     bStart = DM_App_Rom_Get_DumpPos();
     for (i = 0; i < 7; i++)
     {
-        bSlot = (uint8_t)((bStart + 7 - i) % 7);
+        /* Stage 1 keeps the 273-byte wire format for the existing PC tool.
+           Send six real slots in latest-first order, then one zero record. */
+        bSlot = (i < ROM_RESULT_SLOT_COUNT)
+              ? (uint8_t)((bStart + ROM_RESULT_SLOT_COUNT - i) % ROM_RESULT_SLOT_COUNT)
+              : ROM_RESULT_SLOT_COUNT;
         DM_App_Rom_Get_ResultData(bSlot, awResultRec);
 
         for (j = 0; j < 16; j++)
@@ -908,4 +898,23 @@ void DM_App_Main_Sq_Reset_TestCompleteCount(void)
 {
     gs_bTestCompleteCount = 0;
     DM_App_Rom_Set_TestCompleteCount(0);
+}
+
+void DM_App_Main_Sq_Restart_QcSession(void)
+{
+    DM_App_Rom_Reset_AllData();
+
+    /* Completion ACK. SendByte waits before each byte, so explicitly wait once
+       more after the final byte before resetting the MCU. */
+    DM_HW_Drv_USART_SendByte('O');
+    DM_HW_Drv_USART_SendByte('K');
+    DM_HW_Drv_USART_SendByte('\r');
+    DM_HW_Drv_USART_SendByte('\n');
+    DM_HW_Drv_USART_WaitTxComplete();
+
+    WWDG_SWReset();
+    while (1)
+    {
+        /* Defensive: WWDG_SWReset() is not expected to return. */
+    }
 }

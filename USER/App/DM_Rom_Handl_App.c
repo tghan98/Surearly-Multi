@@ -23,9 +23,9 @@
 #define ROM_OFFS_ERROR_STEP             2   /**< Offset for Error Step (1 Byte) */
 #define ROM_OFFS_ERROR_CODE             3   /**< Offset for Error Code (1 Byte) */
 #define ROM_OFFS_STICK_PTR_DATA         4   /**< Offset for Stick PTR Data Block (16 Bytes / 8 Shorts) */
-#define ROM_OFFS_RESULT_DATA            20  /**< Offset for Results (7 Channels * 32 Bytes = 224 Bytes) */
+#define ROM_OFFS_RESULT_DATA            20  /**< Offset for Results (6 slots * 32 Bytes = 192 Bytes) */
+#define ROM_OFFS_QC_REFERENCE           212 /**< QC reference (4 channels * 2 Bytes) */
 
-#define RESULT_CHANNEL_MAX              7   /**< Maximum number of stored results */
 #define RESULT_DATA_SIZE                32  /**< size of 16 shorts in bytes */
 
 /* 최근 결과가 저장된 칸 번호(0~6). 덤프를 최신순으로 내보내기 위한 시작점.
@@ -40,7 +40,7 @@
    덤프 위치가 망가지면 레코드가 최신순으로 나오지 않는다. (2026-10-21) */
 #define ROM_OFFS_WAKE_FAIL_MIN          248 /**< Offset for wake-gate fail min (2 Byte) */
 #define ROM_OFFS_WAKE_FAIL_MAX          250 /**< Offset for wake-gate fail max (2 Byte) */
-/* 252 ~ 255 는 비워 둔다. 다음 4바이트 블록을 깨끗하게 남긴다. */
+#define ROM_OFFS_RESERVED_TAIL          252 /**< Reserved final 4-byte block */
 
 /* Functions -----------------------------------------------------------------*/
 
@@ -191,6 +191,18 @@ void DM_App_Rom_Set_StickPtrData(const uint16_t* pBuffer)
     DM_HW_Drv_EEPROM_Write(ROM_OFFS_STICK_PTR_DATA, (uint8_t*)pBuffer, 16);
 }
 
+void DM_App_Rom_Get_QcReference(uint16_t* pBuffer)
+{
+    DM_HW_Drv_EEPROM_Read(ROM_OFFS_QC_REFERENCE, (uint8_t*)pBuffer,
+                          ROM_QC_REFERENCE_WORDS * 2);
+}
+
+void DM_App_Rom_Set_QcReference(const uint16_t* pBuffer)
+{
+    DM_HW_Drv_EEPROM_Write(ROM_OFFS_QC_REFERENCE, (uint8_t*)pBuffer,
+                           ROM_QC_REFERENCE_WORDS * 2);
+}
+
 /**
   * @brief  Reads 16 result data (short) from a specific channel.
   * @param  bChannel: Channel index (0 ~ 6).
@@ -199,10 +211,15 @@ void DM_App_Rom_Set_StickPtrData(const uint16_t* pBuffer)
   */
 void DM_App_Rom_Get_ResultData(uint8_t bChannel, uint16_t* pBuffer)
 {
+    static uint8_t i;
     uint16_t wAddr;
     
-    if (bChannel >= RESULT_CHANNEL_MAX) 
+    if (bChannel >= ROM_RESULT_SLOT_COUNT)
     {
+        for (i = 0; i < 16; i++)
+        {
+            pBuffer[i] = 0;
+        }
         return;
     }
     
@@ -224,10 +241,9 @@ uint8_t DM_App_Rom_Get_DumpPos(void)
     /* Initial state / out-of-range check.
        구형 펌웨어로 이미 결과를 쌓아둔 기기는 이 자리가 0xFF로 비어 있다.
        그때만 삽입 횟수에서 역산한다. 한 번 저장하고 나면 적어둔 값을 쓴다. */
-    if (bData >= RESULT_CHANNEL_MAX)
+    if (bData >= ROM_RESULT_SLOT_COUNT)
     {
-        uint8_t bCnt = DM_App_Rom_Get_InsertCount();
-        bData = (bCnt > 0) ? (uint8_t)((bCnt - 1) % RESULT_CHANNEL_MAX) : 0;
+        bData = 0;
     }
     return bData;
 }
@@ -299,19 +315,19 @@ void DM_App_Rom_Update_WakeFail(uint16_t wADC)
 }
 
 /**
-  * @brief  Saves 16 result data (short) to the current channel.
-  * @note   Channel index is wrap-around using (bIndex % 7).
-  * @param  bIndex: Target channel index or current count.
+  * @brief  Saves 16 result words to the next slot in the six-slot ring.
+  * @note   DumpPos is the latest saved slot. A reset value of 0 therefore makes
+  *         slot 1 the first physical write; this does not affect latest-first
+  *         dump ordering and all six slots participate after one full turn.
   * @param  pBuffer: Pointer to uint16_t array (size 16) containing result.
   * @retval None
   */
-void DM_App_Rom_Save_CurrentResult(uint8_t bIndex, const uint16_t* pBuffer)
+void DM_App_Rom_Save_NextResult(const uint16_t* pBuffer)
 {
     uint8_t bChannel;
     uint16_t wAddr;
-    
-    /* Calculate channel index (0 ~ 6) */
-    bChannel = (uint8_t)(bIndex % RESULT_CHANNEL_MAX);
+
+    bChannel = (uint8_t)((DM_App_Rom_Get_DumpPos() + 1) % ROM_RESULT_SLOT_COUNT);
     
     wAddr = ROM_OFFS_RESULT_DATA + (uint16_t)(bChannel * RESULT_DATA_SIZE);
     
@@ -321,6 +337,31 @@ void DM_App_Rom_Save_CurrentResult(uint8_t bIndex, const uint16_t* pBuffer)
        호출처(442/749/781행)가 아니라 여기서 적는 이유는, 저장 위치를 계산하는
        자리가 여기 하나뿐이라 두 값이 어긋날 틈이 없기 때문이다. */
     DM_App_Rom_Set_DumpPos(bChannel);
+}
+
+void DM_App_Rom_Reset_AllData(void)
+{
+    uint8_t abZero[4] = {0, 0, 0, 0};
+    uint8_t abErased[4] = {0xFF, 0xFF, 0xFF, 0xFF};
+    uint8_t abDumpBlock[4] = {0, 0xFF, 0xFF, 0xFF};
+    uint16_t wAddr;
+
+    /* 0~211: counters, status, StickPtrData and six result slots. */
+    for (wAddr = 0; wAddr < ROM_OFFS_QC_REFERENCE; wAddr += 4)
+    {
+        DM_HW_Drv_EEPROM_Write(wAddr, abZero, 4);
+    }
+
+    /* 212~243: blank QC reference plus the retired tail of old slot 7. */
+    for (wAddr = ROM_OFFS_QC_REFERENCE; wAddr < ROM_OFFS_DUMP_POS; wAddr += 4)
+    {
+        DM_HW_Drv_EEPROM_Write(wAddr, abErased, 4);
+    }
+
+    /* 244: latest slot reset to 0. Keep the rest erased, including WakeFail. */
+    DM_HW_Drv_EEPROM_Write(ROM_OFFS_DUMP_POS, abDumpBlock, 4);
+    DM_HW_Drv_EEPROM_Write(ROM_OFFS_WAKE_FAIL_MIN, abErased, 4);
+    DM_HW_Drv_EEPROM_Write(ROM_OFFS_RESERVED_TAIL, abErased, 4);
 }
 
 /************************ (C) COPYRIGHT Surearly Multi *****END OF FILE****/

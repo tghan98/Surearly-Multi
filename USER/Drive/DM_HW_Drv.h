@@ -118,6 +118,9 @@ void DM_HW_Drv_USART_Init(void);
   */
 void DM_HW_Drv_USART_SendByte(uint8_t bData);
 
+/** Waits until the final USART byte has completely left the shift register. */
+void DM_HW_Drv_USART_WaitTxComplete(void);
+
 /**
   * @brief  Sends a 16-bit value as 2 raw bytes via USART1 (High byte first, no ASCII conversion).
   * @param  wVal: Value to send.

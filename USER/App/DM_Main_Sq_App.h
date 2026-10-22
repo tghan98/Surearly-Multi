@@ -151,10 +151,9 @@ void DM_App_Main_Sq_Set_ErrorSequence(uint8_t bErrorSq);
 
 /**
   * @brief  Packs current measurement and result data into 32 bytes and saves to ROM.
-  * @param  bInsertCount: Current stick insert count.
   * @retval None
   */
-void DM_App_Main_Sq_Save_Result_To_Rom(uint8_t bInsertCount);
+void DM_App_Main_Sq_Save_Result_To_Rom(void);
 
 /**
   * @brief  Sends stored EEPROM data as raw uint16_t words via USART (no ASCII/CSV conversion).
@@ -174,6 +173,9 @@ void DM_App_Main_Sq_Send_RawDump(void);
   * @retval None
   */
 void DM_App_Main_Sq_Reset_TestCompleteCount(void);
+
+/** Erases device data, acknowledges completion, then restarts for a new QC session. */
+void DM_App_Main_Sq_Restart_QcSession(void);
 
 #endif /* __DM_MAIN_SQ_APP_H__ */
 

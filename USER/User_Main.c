@@ -149,9 +149,10 @@ INTERRUPT_HANDLER(USART1_RX_TIM5_CC_IRQHandler, 28)
         /* Read the received byte (Clears the RXNE flag) */
         bReceivedData = USART_ReceiveData8(USART1);
 
-        /* Detect 'M'/'m' (dump) or 'R'/'r' (reset test complete count) */
+        /* M: dump, R: usage-count reset, Q: full QC-session reset. */
         if (bReceivedData == 'M' || bReceivedData == 'm' ||
-            bReceivedData == 'R' || bReceivedData == 'r')
+            bReceivedData == 'R' || bReceivedData == 'r' ||
+            bReceivedData == 'Q' || bReceivedData == 'q')
         {
             bCommandChar = bReceivedData;
         }
@@ -167,6 +168,11 @@ INTERRUPT_HANDLER(USART1_RX_TIM5_CC_IRQHandler, 28)
             {
                 /* Command recognized: Reset test complete count */
                 DM_App_Main_Sq_Reset_TestCompleteCount();
+            }
+            else if (bCommandChar == 'Q' || bCommandChar == 'q')
+            {
+                /* Development-only QC restart: reset data EEPROM and RAM. */
+                DM_App_Main_Sq_Restart_QcSession();
             }
             bCommandChar = 0; /* Reset */
         }

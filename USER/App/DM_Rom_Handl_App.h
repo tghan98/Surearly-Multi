@@ -21,6 +21,9 @@
 
 /* Exported Functions --------------------------------------------------------*/
 
+#define ROM_RESULT_SLOT_COUNT       6
+#define ROM_QC_REFERENCE_WORDS      4
+
 /**
   * @brief  Reads the stick insert count from EEPROM.
   * @note   If the value is 0xFF (initial state), it initializes it to 0.
@@ -96,6 +99,12 @@ void DM_App_Rom_Get_StickPtrData(uint16_t* pBuffer);
   */
 void DM_App_Rom_Set_StickPtrData(const uint16_t* pBuffer);
 
+/** Reads the four-channel QC reference without normalising erased 0xFFFF. */
+void DM_App_Rom_Get_QcReference(uint16_t* pBuffer);
+
+/** Stores one complete four-channel QC reference set. */
+void DM_App_Rom_Set_QcReference(const uint16_t* pBuffer);
+
 /**
   * @brief  Reads the wake-gate fail reading range (min, max) from EEPROM.
   * @note   Normalises the factory-fresh state (both 0xFFFF) on read: max is set
@@ -116,24 +125,23 @@ void DM_App_Rom_Update_WakeFail(uint16_t wADC);
 
 /**
   * @brief  Reads 16 result data (short) from a specific channel.
-  * @param  bChannel: Channel index (0 ~ 6).
+  * @param  bChannel: Channel index (0 ~ 5).
   * @param  pBuffer: Pointer to uint16_t array (size 16) to store data.
   * @retval None
   */
 void DM_App_Rom_Get_ResultData(uint8_t bChannel, uint16_t* pBuffer);
 
 /**
-  * @brief  Saves 16 result data (short) to the current channel.
-  * @note   Channel index is wrap-around using (bIndex % 7).
-  * @param  bIndex: Target channel index or current count.
+  * @brief  Saves 16 result words to the next slot in the six-slot ring.
+  * @note   Ring position is independent of Insert Count.
   * @param  pBuffer: Pointer to uint16_t array (size 16) containing result to write.
   * @retval None
   */
-void DM_App_Rom_Save_CurrentResult(uint8_t bIndex, const uint16_t* pBuffer);
+void DM_App_Rom_Save_NextResult(const uint16_t* pBuffer);
 
 /**
   * @brief  Reads the slot index of the most recently saved result.
-  * @note   Valid range 0 ~ 6. Returns 0 if unwritten (0xFF) or out of range.
+  * @note   Valid range 0 ~ 5. Returns 0 if unwritten (0xFF) or out of range.
   * @param  None
   * @retval uint8_t: Slot index (0 ~ 6).
   */
@@ -145,5 +153,8 @@ uint8_t DM_App_Rom_Get_DumpPos(void);
   * @retval None
   */
 void DM_App_Rom_Set_DumpPos(uint8_t bPos);
+
+/** Restores the complete 0~255 data EEPROM map to its initial values. */
+void DM_App_Rom_Reset_AllData(void);
 
 #endif /* __DM_ROM_HAND_APP_H__ */
