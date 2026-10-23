@@ -193,12 +193,14 @@
     color: #fff;
   }
   .btn-service:hover:not(:disabled) { background: #6d28d9; }
+  /* DEV-ONLY:reset-style START */
   .btn-service.reset {
     background: #ea580c;
   }
   .btn-service.reset:hover:not(:disabled) { background: #c2410c; }
+  /* DEV-ONLY:reset-style END */
 
-  /* 개발용 전용. 생산용 UI 분리 시 .btn-service.qc 관련 규칙을 통째로 제거한다. */
+  /* DEV-ONLY:qc-style START */
   .btn-service.qc {
     background: #b91c1c;
   }
@@ -212,6 +214,7 @@
     color: #b91c1c;
     margin-left: 6px;
   }
+  /* DEV-ONLY:qc-style END */
 
   .dump-progress {
     font-size: 12px;
@@ -284,7 +287,9 @@
   <div class="panel">
     <h2>서비스 명령</h2>
     <div class="row">
+      <!-- DEV-ONLY:reset-button START -->
       <button id="btnReset" class="btn-service reset" disabled>테스트 카운트 리셋 ('R')</button>
+      <!-- DEV-ONLY:reset-button END -->
       <button id="btnRawDump" class="btn-service" disabled>RawDump 읽기 ('M')</button>
       <span id="dumpProgress" class="dump-progress"></span>
     </div>
@@ -292,13 +297,20 @@
       <button id="btnSaveCsv" class="btn-select" disabled>CSV로 저장</button>
       <button id="btnExportPdf" class="btn-select" disabled>PDF로 출력</button>
     </div>
-    <!-- 개발용 전용 구역. 생산용 UI 분리 시 이 row 전체와 아래 btnQcReset 스크립트를 제거한다. -->
+    <!-- DEV-ONLY:qc-button START -->
     <div class="row">
       <button id="btnQcReset" class="btn-service qc" disabled>QC 세션 초기화 ('Q')</button>
       <span class="dev-only-note">개발용 — 데이터 EEPROM 전체를 지우고 기기를 재시작합니다</span>
     </div>
+    <!-- DEV-ONLY:qc-button END -->
     <div class="dump-result" id="rawDumpResult"></div>
-    <div class="notice">리셋: <code>'R'</code>/<code>'r'</code> + Enter → EEPROM/RAM의 TestCompleteCount 초기화. RawDump: <code>'M'</code>/<code>'m'</code> + Enter → 249바이트(레코드 6개, QC 기준값 포함) 응답을 자동 파싱합니다. 구형 269·273바이트도 지원합니다. 레코드는 최신순으로 옵니다. QC 세션 초기화: <code>'Q'</code>/<code>'q'</code> + Enter → 데이터 EEPROM 전체 초기화 후 <code>OK</code> 응답, 이어서 기기 재시작. 오클릭 방지를 위해 두 번 눌러야 전송됩니다. (개발용)</div>
+    <div class="notice">RawDump: <code>'M'</code>/<code>'m'</code> + Enter → 249바이트(레코드 6개, QC 기준값 포함) 응답을 자동 파싱합니다. 구형 269·273바이트도 지원합니다. 레코드는 최신순으로 옵니다.</div>
+    <!-- DEV-ONLY:reset-notice START -->
+    <div class="notice">리셋: <code>'R'</code>/<code>'r'</code> + Enter → EEPROM/RAM의 TestCompleteCount 초기화.</div>
+    <!-- DEV-ONLY:reset-notice END -->
+    <!-- DEV-ONLY:qc-notice START -->
+    <div class="notice">QC 세션 초기화: <code>'Q'</code>/<code>'q'</code> + Enter → 데이터 EEPROM 전체 초기화 후 <code>OK</code> 응답, 이어서 기기 재시작. 오클릭 방지를 위해 두 번 눌러야 전송됩니다. (개발용)</div>
+    <!-- DEV-ONLY:qc-notice END -->
   </div>
 
   <div class="panel">
@@ -328,8 +340,12 @@
   const btnClose = document.getElementById('btnClose');
   const btnSend = document.getElementById('btnSend');
   const btnClear = document.getElementById('btnClear');
+  // DEV-ONLY:reset-ref START
   const btnReset = document.getElementById('btnReset');
+  // DEV-ONLY:reset-ref END
+  // DEV-ONLY:qc-ref START
   const btnQcReset = document.getElementById('btnQcReset');
+  // DEV-ONLY:qc-ref END
   const btnRawDump = document.getElementById('btnRawDump');
   const btnSaveCsv = document.getElementById('btnSaveCsv');
   const btnExportPdf = document.getElementById('btnExportPdf');
@@ -433,10 +449,14 @@
     sendInput.disabled = !connected;
     btnSend.disabled = !connected;
     btnSelect.disabled = connected;
+    // DEV-ONLY:reset-status START
     btnReset.disabled = !connected;
+    // DEV-ONLY:reset-status END
     btnRawDump.disabled = !connected;
+    // DEV-ONLY:qc-status START
     btnQcReset.disabled = !connected;
     disarmQcReset();
+    // DEV-ONLY:qc-status END
   }
 
   function describePort(p) {
@@ -570,14 +590,16 @@
     }
   }
 
+  // DEV-ONLY:reset-handler START
   btnReset.addEventListener('click', async () => {
     const bytes = new TextEncoder().encode('R' + getLineEnding());
     const ok = await writeBytes(bytes);
     if (ok) log(`TX: 테스트 카운트 리셋 명령 전송 ('R')`, 'sys');
   });
+  // DEV-ONLY:reset-handler END
 
-  /* 개발용 전용. 생산용 UI 분리 시 아래 QC 초기화 블록을 제거한다.
-     브라우저 모달(confirm)은 포트 통신을 막을 수 있어 쓰지 않는다.
+  // DEV-ONLY:qc-handler START
+  /* 브라우저 모달(confirm)은 포트 통신을 막을 수 있어 쓰지 않는다.
      대신 버튼 자신을 4초간 '무장' 상태로 바꿔 두 번 눌러야 전송되게 한다. */
   const QC_ARM_TIMEOUT_MS = 4000;
   const QC_BTN_LABEL = "QC 세션 초기화 ('Q')";
@@ -605,6 +627,7 @@
     const ok = await writeBytes(bytes);
     if (ok) log("TX: QC 세션 초기화 명령 전송 ('Q') — OK 응답 후 기기가 재시작됩니다", 'sys');
   });
+  // DEV-ONLY:qc-handler END
 
   btnRawDump.addEventListener('click', async () => {
     if (rawDumpTailTimer) { clearTimeout(rawDumpTailTimer); rawDumpTailTimer = null; }
