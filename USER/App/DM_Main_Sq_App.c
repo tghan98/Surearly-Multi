@@ -849,9 +849,11 @@ static void DM_App_Main_Sq_Send_FixedStr(const char* pcStr, uint8_t bLen)
   * @note   Leading header (21 bytes, fixed-width, truncated/padded as needed):
   *         _strFIRMWARE_VER (4), _REAL_FIRMWARE_VER (8), _strLOT_UPPER_4CHAR (4),
   *         _strLOT_LOWER_5NUM (5). Then word order: InsertCnt, TestCompCnt,
-  *         ErrStep, ErrCode (4 words), Initial Stick PTR data (8 words), then
-  *         7 x 16-word Result Records. Each word is sent High-byte-first.
-  *         Total payload: 21 + (4+8+7*16)*2 = 21 + 248 = 269 bytes.
+  *         ErrStep, ErrCode (4 words), Initial Stick PTR data (8 words),
+  *         6 x 16-word Result Records, QC reference (4 words), then Wake Fail
+  *         min/max (2 words). Each word is sent High-byte-first.
+  *         Total: 21 + (4+8+6*16+4+2)*2 = 249 bytes.
+  *         Byte offsets: results 45..236, QC 237..244, Wake Fail 245..248.
   * @param  None
   * @retval None
   */
@@ -867,30 +869,25 @@ void DM_App_Main_Sq_Send_RawDump(void)
     DM_App_Main_Sq_Send_FixedStr(_strLOT_UPPER_4CHAR, 4);
     DM_App_Main_Sq_Send_FixedStr(_strLOT_LOWER_5NUM, 5);
 
-    /* 1. Core status counters/codes, sent as raw words */
-    DM_HW_Drv_USART_SendWord((uint16_t)DM_App_Rom_Get_InsertCount());
-    DM_HW_Drv_USART_SendWord((uint16_t)DM_App_Rom_Get_TestCompleteCount());
-    DM_HW_Drv_USART_SendWord((uint16_t)DM_App_Rom_Get_ErrorStep());
-    DM_HW_Drv_USART_SendWord((uint16_t)DM_App_Rom_Get_ErrorCode());
-
-    /* 2. Initial Stick PTR data (8 words) */
-    DM_App_Rom_Get_StickPtrData(gs_awInitialStickPtr);
-    for (i = 0; i < 8; i++)
+    /* 1. Core status counters/codes, read without EEPROM writes */
+    DM_App_Rom_Get_DumpStatus(awResultRec);
+    for (i = 0; i < 4; i++)
     {
-        DM_HW_Drv_USART_SendWord(gs_awInitialStickPtr[i]);
+        DM_HW_Drv_USART_SendWord(awResultRec[i]);
     }
 
-    /* 3. Stage-1 wire compatibility: six real result records plus one zero
-          record, keeping the existing 273-byte packet until stage 4.
-          Real records are sent newest first. */
-    bStart = DM_App_Rom_Get_DumpPos();
-    for (i = 0; i < 7; i++)
+    /* 2. Initial Stick PTR data (8 words) */
+    DM_App_Rom_Get_StickPtrData(awResultRec);
+    for (i = 0; i < 8; i++)
     {
-        /* Stage 1 keeps the 273-byte wire format for the existing PC tool.
-           Send six real slots in latest-first order, then one zero record. */
-        bSlot = (i < ROM_RESULT_SLOT_COUNT)
-              ? (uint8_t)((bStart + ROM_RESULT_SLOT_COUNT - i) % ROM_RESULT_SLOT_COUNT)
-              : ROM_RESULT_SLOT_COUNT;
+        DM_HW_Drv_USART_SendWord(awResultRec[i]);
+    }
+
+    /* 3. Six result records, newest first */
+    bStart = DM_App_Rom_Get_DumpPos();
+    for (i = 0; i < ROM_RESULT_SLOT_COUNT; i++)
+    {
+        bSlot = (uint8_t)((bStart + ROM_RESULT_SLOT_COUNT - i) % ROM_RESULT_SLOT_COUNT);
         DM_App_Rom_Get_ResultData(bSlot, awResultRec);
 
         for (j = 0; j < 16; j++)
@@ -899,14 +896,18 @@ void DM_App_Main_Sq_Send_RawDump(void)
         }
     }
 
-    /* 4. 깨운 직후 광학 관문을 통과하지 못한 회차의 CH3 원본값 범위 (2 words)
-          맨 뒤에 붙인다. 앞쪽 바이트 위치가 그대로라 PC 파서는 "끝에 두 값이
-          더 온다"만 추가하면 된다. 269 -> 273 바이트. */
+    /* 4. QC reference (4 words), followed by the Wake Fail range (2 words) */
+    DM_App_Rom_Get_QcReference(awResultRec);
+    for (i = 0; i < ROM_QC_REFERENCE_WORDS; i++)
+    {
+        DM_HW_Drv_USART_SendWord(awResultRec[i]);
+    }
+
     {
         uint16_t wFailMin = 0;
         uint16_t wFailMax = 0;
 
-        DM_App_Rom_Get_WakeFail(&wFailMin, &wFailMax);
+        DM_App_Rom_Get_DumpWakeFail(&wFailMin, &wFailMax);
         DM_HW_Drv_USART_SendWord(wFailMin);
         DM_HW_Drv_USART_SendWord(wFailMax);
     }

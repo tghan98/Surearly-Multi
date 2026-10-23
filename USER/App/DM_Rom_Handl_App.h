@@ -24,6 +24,9 @@
 #define ROM_RESULT_SLOT_COUNT       6
 #define ROM_QC_REFERENCE_WORDS      4
 
+/** Reads the four status bytes for a dump, mapping erased 0xFF to 0 without writing. */
+void DM_App_Rom_Get_DumpStatus(uint16_t* pBuffer);
+
 /**
   * @brief  Reads the stick insert count from EEPROM.
   * @note   If the value is 0xFF (initial state), it initializes it to 0.
@@ -86,7 +89,7 @@ void DM_App_Rom_Set_ErrorCode(uint8_t bCode);
 
 /**
   * @brief  Reads 8 stick PTR data (short) from EEPROM.
-  * @note   If uninitialized (0xFFFF), sets all to 0.
+  * @note   If uninitialized (0xFFFF), returns zeros without writing EEPROM.
   * @param  pBuffer: Pointer to uint16_t array (size 8) to store data.
   * @retval None
   */
@@ -114,6 +117,9 @@ void DM_App_Rom_Set_QcReference(const uint16_t* pBuffer);
   * @retval None
   */
 void DM_App_Rom_Get_WakeFail(uint16_t* pMin, uint16_t* pMax);
+
+/** Reads Wake Fail for a dump, mapping erased FFFF/FFFF to FFFF/0 without writing. */
+void DM_App_Rom_Get_DumpWakeFail(uint16_t* pMin, uint16_t* pMax);
 
 /**
   * @brief  Widens the stored wake-gate fail range with one new reading.

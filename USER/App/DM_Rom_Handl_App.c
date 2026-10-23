@@ -44,6 +44,18 @@
 
 /* Functions -----------------------------------------------------------------*/
 
+void DM_App_Rom_Get_DumpStatus(uint16_t* pBuffer)
+{
+    uint8_t abStatus[4];
+    uint8_t i;
+
+    DM_HW_Drv_EEPROM_Read(ROM_OFFS_INSERT_COUNT, abStatus, 4);
+    for (i = 0; i < 4; i++)
+    {
+        pBuffer[i] = (abStatus[i] == 0xFF) ? 0 : abStatus[i];
+    }
+}
+
 /**
   * @brief  Reads the stick insert count from EEPROM.
   * @param  None
@@ -177,7 +189,6 @@ void DM_App_Rom_Get_StickPtrData(uint16_t* pBuffer)
         {
             pBuffer[i] = 0;
         }
-        DM_App_Rom_Set_StickPtrData(pBuffer);
     }
 }
 
@@ -286,6 +297,17 @@ void DM_App_Rom_Get_WakeFail(uint16_t* pMin, uint16_t* pMax)
 
     *pMin = wMin;
     *pMax = wMax;
+}
+
+void DM_App_Rom_Get_DumpWakeFail(uint16_t* pMin, uint16_t* pMax)
+{
+    DM_HW_Drv_EEPROM_Read(ROM_OFFS_WAKE_FAIL_MIN, (uint8_t*)pMin, 2);
+    DM_HW_Drv_EEPROM_Read(ROM_OFFS_WAKE_FAIL_MAX, (uint8_t*)pMax, 2);
+
+    if ((*pMin == 0xFFFF) && (*pMax == 0xFFFF))
+    {
+        *pMax = 0;
+    }
 }
 
 /**

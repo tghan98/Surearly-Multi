@@ -421,7 +421,7 @@ void DM_HW_Drv_Power_Resume(void)
   */
 void DM_HW_Drv_EEPROM_Write(uint16_t wAddrOffset, uint8_t* pBuffer, uint16_t wLength)
 {
-    static uint16_t i;
+    uint16_t i;
     uint32_t dwBaseAddr = EEPROM_START_ADDR;
     
     /* Unlock Data EEPROM */
@@ -452,7 +452,7 @@ void DM_HW_Drv_EEPROM_Write(uint16_t wAddrOffset, uint8_t* pBuffer, uint16_t wLe
   */
 void DM_HW_Drv_EEPROM_Read(uint16_t wAddrOffset, uint8_t* pBuffer, uint16_t wLength)
 {
-    static uint16_t i;
+    uint16_t i;
     uint32_t dwBaseAddr = EEPROM_START_ADDR;
 
     for (i = 0; i < wLength; i++)
