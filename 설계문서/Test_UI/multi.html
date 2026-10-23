@@ -298,7 +298,7 @@
       <span class="dev-only-note">개발용 — 데이터 EEPROM 전체를 지우고 기기를 재시작합니다</span>
     </div>
     <div class="dump-result" id="rawDumpResult"></div>
-    <div class="notice">리셋: <code>'R'</code>/<code>'r'</code> + Enter → EEPROM/RAM의 TestCompleteCount 초기화. RawDump: <code>'M'</code>/<code>'m'</code> + Enter → 헤더(21B)+상태(8B)+초기스틱(16B)+레코드7개(224B)+헛깨어남범위(4B) = 총 273바이트 응답을 자동 파싱합니다. 레코드는 최신순으로 옵니다. QC 세션 초기화: <code>'Q'</code>/<code>'q'</code> + Enter → 데이터 EEPROM 전체 초기화 후 <code>OK</code> 응답, 이어서 기기 재시작. 오클릭 방지를 위해 두 번 눌러야 전송됩니다. (개발용)</div>
+    <div class="notice">리셋: <code>'R'</code>/<code>'r'</code> + Enter → EEPROM/RAM의 TestCompleteCount 초기화. RawDump: <code>'M'</code>/<code>'m'</code> + Enter → 249바이트(레코드 6개, QC 기준값 포함) 응답을 자동 파싱합니다. 구형 269·273바이트도 지원합니다. 레코드는 최신순으로 옵니다. QC 세션 초기화: <code>'Q'</code>/<code>'q'</code> + Enter → 데이터 EEPROM 전체 초기화 후 <code>OK</code> 응답, 이어서 기기 재시작. 오클릭 방지를 위해 두 번 눌러야 전송됩니다. (개발용)</div>
   </div>
 
   <div class="panel">
@@ -347,15 +347,12 @@
   }
   const rawDumpResultEl = document.getElementById('rawDumpResult');
 
-  // RawDump format per EEPROM_UART.md §2-4/§2-5:
-  //   header 21 + state 8 + initial stick 16 + 7 records x 32           = 269B  (구 펌웨어)
-  //   + wake-fail range 4                                               = 273B  (2026-10-21~)
-  // 맨 뒤 4바이트는 나중에 붙였으므로 앞쪽 바이트 위치는 양쪽이 같다.
-  // 구 펌웨어가 들어간 기기도 그대로 읽을 수 있게 둘 다 받는다.
-  // 269 까지 받고 나서 더 오지 않으면(RAWDUMP_TAIL_WAIT_MS) 구 펌웨어로 본다.
-  const RAWDUMP_BASE_BYTES = 21 + 8 + 16 + (7 * 32);
-  const RAWDUMP_TOTAL_BYTES = RAWDUMP_BASE_BYTES + 4;
-  const RAWDUMP_TAIL_WAIT_MS = 300;   // 9600bps 에서 4바이트는 약 4ms. 넉넉히 잡았다.
+  // 249B: 6 records + QC reference + Wake Fail. Legacy: 7 records (269B),
+  // optionally followed by Wake Fail (273B). No version marker distinguishes them.
+  const RAWDUMP_NEW_BYTES = 21 + 8 + 16 + (6 * 32) + 8 + 4;
+  const RAWDUMP_LEGACY_BASE_BYTES = 21 + 8 + 16 + (7 * 32);
+  const RAWDUMP_LEGACY_TOTAL_BYTES = RAWDUMP_LEGACY_BASE_BYTES + 4;
+  const RAWDUMP_TAIL_WAIT_MS = 300;
   let rawDumpTailTimer = null;
   let rawDumpActive = false;
   let rawDumpBuffer = [];
@@ -392,7 +389,8 @@
       insertCount: EMPTY_VALUE, testCompleteCount: EMPTY_VALUE, errorStep: EMPTY_VALUE, errorCode: null,
       wakeFailMin: EMPTY_VALUE, wakeFailMax: EMPTY_VALUE,
       initialStick: STICK_BANDS.map(band => ({ band, value: EMPTY_VALUE })),
-      records: Array.from({ length: 7 }, (_, slot) => ({
+      qcReference: STICK_BANDS.map(band => ({ band, value: EMPTY_VALUE })),
+      records: Array.from({ length: 6 }, (_, slot) => ({
         slot,
         gain: [EMPTY_VALUE, EMPTY_VALUE, EMPTY_VALUE, EMPTY_VALUE],
         emptyBand: { T: EMPTY_VALUE, BT: EMPTY_VALUE, BC: EMPTY_VALUE, C: EMPTY_VALUE },
@@ -609,6 +607,7 @@
   });
 
   btnRawDump.addEventListener('click', async () => {
+    if (rawDumpTailTimer) { clearTimeout(rawDumpTailTimer); rawDumpTailTimer = null; }
     rawDumpBuffer = [];
     rawDumpActive = true;
     updateDumpProgress();
@@ -625,10 +624,7 @@
 
   function updateDumpProgress() {
     if (!rawDumpActive) { dumpProgressEl.textContent = ''; return; }
-    const n = rawDumpBuffer.length;
-    const tail = (n >= RAWDUMP_BASE_BYTES && n < RAWDUMP_TOTAL_BYTES)
-      ? ' — 뒤 4바이트 대기 중 (없으면 구 펌웨어)' : '';
-    dumpProgressEl.textContent = `수신 중... ${n} / ${RAWDUMP_TOTAL_BYTES} bytes${tail}`;
+    dumpProgressEl.textContent = `수신 중... ${rawDumpBuffer.length} bytes`;
   }
 
   function finishRawDump(size) {
@@ -638,8 +634,9 @@
     rawDumpActive = false;
     rawDumpBuffer = [];
     updateDumpProgress();
-    const kind = (size === RAWDUMP_TOTAL_BYTES)
-      ? '' : ' — 구 펌웨어로 판단, Wake Fail 은 표시하지 않습니다';
+    const kind = size === RAWDUMP_LEGACY_BASE_BYTES
+      ? ' — 구 형식, QC 기준값·Wake Fail 미포함'
+      : size === RAWDUMP_LEGACY_TOTAL_BYTES ? ' — 구 형식, QC 기준값 미포함' : '';
     log(`RawDump 수신 완료 (${size} bytes)${kind}`, 'sys');
     try {
       renderRawDump(packet);
@@ -656,20 +653,25 @@
     for (const b of value) rawDumpBuffer.push(b);
     updateDumpProgress();
 
-    if (rawDumpBuffer.length >= RAWDUMP_TOTAL_BYTES) {
-      finishRawDump(RAWDUMP_TOTAL_BYTES);
+    if (rawDumpTailTimer) { clearTimeout(rawDumpTailTimer); rawDumpTailTimer = null; }
+    if (rawDumpBuffer.length >= RAWDUMP_LEGACY_TOTAL_BYTES) {
+      finishRawDump(RAWDUMP_LEGACY_TOTAL_BYTES);
       return;
     }
 
-    // 269 까지는 왔는데 뒤 4바이트가 아직이다. 구 펌웨어일 수 있으므로
-    // 잠시 더 기다렸다가 안 오면 거기서 끝난 것으로 본다.
-    // 직렬 통신은 끊겨서 오기도 하므로 새 조각이 올 때마다 시계를 다시 건다.
-    if (rawDumpBuffer.length >= RAWDUMP_BASE_BYTES) {
-      if (rawDumpTailTimer) clearTimeout(rawDumpTailTimer);
+    // Both 249 and 269 can be a complete packet or the prefix of a longer one.
+    if (rawDumpBuffer.length >= RAWDUMP_NEW_BYTES) {
       rawDumpTailTimer = setTimeout(() => {
         rawDumpTailTimer = null;
-        if (rawDumpActive && rawDumpBuffer.length >= RAWDUMP_BASE_BYTES) {
-          finishRawDump(RAWDUMP_BASE_BYTES);
+        if (!rawDumpActive) return;
+        const size = rawDumpBuffer.length;
+        if (size === RAWDUMP_NEW_BYTES || size === RAWDUMP_LEGACY_BASE_BYTES) {
+          finishRawDump(size);
+        } else {
+          rawDumpActive = false;
+          rawDumpBuffer = [];
+          updateDumpProgress();
+          log(`RawDump 수신 불완전 (${size} bytes)`, 'sys');
         }
       }, RAWDUMP_TAIL_WAIT_MS);
     }
@@ -679,8 +681,12 @@
     return s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   }
 
-  // Parser per EEPROM_UART.md §2-5: string fields are fixed-width ASCII (zero-padded), the rest are words (2 bytes, high byte first)
+  // Fixed-width ASCII header, followed by high-byte-first words.
   function parseRawDump(bytes) {
+    const isNewFormat = bytes.length === RAWDUMP_NEW_BYTES;
+    if (!isNewFormat && bytes.length !== RAWDUMP_LEGACY_BASE_BYTES && bytes.length !== RAWDUMP_LEGACY_TOTAL_BYTES) {
+      throw new Error(`지원하지 않는 덤프 길이: ${bytes.length} bytes`);
+    }
     let offset = 0;
     function readStr(len) {
       let s = '';
@@ -713,7 +719,7 @@
     for (let i = 0; i < 4; i++) readWord();
 
     const records = [];
-    for (let slot = 0; slot < 7; slot++) {
+    for (let slot = 0; slot < (isNewFormat ? 6 : 7); slot++) {
       const gain = [readWord(), readWord(), readWord(), readWord()];
       const emptyBand = { T: readWord(), BT: readWord(), BC: readWord(), C: readWord() };
       const resultBand = { T: readWord(), BT: readWord(), BC: readWord(), C: readWord() };
@@ -724,13 +730,17 @@
       records.push({ slot, gain, emptyBand, resultBand, calc, errorStep: recErrStep, errorCode: recErrCode });
     }
 
-    // 깨운 직후 광학 관문을 통과하지 못한 회차의 CH3 원본값 범위 (2026-10-21 추가)
-    // 구 펌웨어는 이 4바이트를 보내지 않는다. 그때는 '-' 로 둔다.
-    const hasWakeFail = (bytes.length >= offset + 4);
+    const qcReference = STICK_BANDS.map(band => ({
+      band, value: isNewFormat ? readWord() : EMPTY_VALUE,
+    }));
+
+    // The 269-byte format has neither QC reference nor Wake Fail.
+    const hasWakeFail = bytes.length !== RAWDUMP_LEGACY_BASE_BYTES;
     const wakeFailMin = hasWakeFail ? readWord() : EMPTY_VALUE;
     const wakeFailMax = hasWakeFail ? readWord() : EMPTY_VALUE;
 
-    return { firmwareVer, realFirmwareVer, lotUpper, lotLower, insertCount, testCompleteCount, errorStep, errorCode, initialStick, records, wakeFailMin, wakeFailMax };
+    if (offset !== bytes.length) throw new Error(`덤프 길이 불일치: ${offset}/${bytes.length}`);
+    return { firmwareVer, realFirmwareVer, lotUpper, lotLower, insertCount, testCompleteCount, errorStep, errorCode, initialStick, records, qcReference, wakeFailMin, wakeFailMax };
   }
 
   // 깨운 직후 광학 관문을 통과하지 못한 회차의 CH3 원본값 범위를 사람 말로 옮긴다.
@@ -773,6 +783,8 @@
     const stickValueCells = d.initialStick.map(s => `
       <td class="${isOutOfRange(s.value, STICK_RAW_RANGE) ? 'value-warn' : ''}">${s.value}</td>
     `).join('');
+    const qcHeaderCells = d.qcReference.map(s => `<th>QC ${s.band}</th>`).join('');
+    const qcValueCells = d.qcReference.map(s => `<td>${s.value}</td>`).join('');
 
     const recordRows = d.records.map((r, i) => `
       <tr class="${i === latestSlot ? 'latest' : ''}">
@@ -825,6 +837,13 @@
         </table>
       </div>
 
+      <div class="table-scroll">
+        <table>
+          <thead><tr><th>필드</th>${qcHeaderCells}</tr></thead>
+          <tbody><tr><td>기준값(Value)</td>${qcValueCells}</tr></tbody>
+        </table>
+      </div>
+
       <div class="range-note">${describeWakeFail(d.wakeFailMin, d.wakeFailMax)}</div>
       <div class="table-scroll">
         <table>
@@ -872,6 +891,9 @@
     rows.push([]);
     rows.push(['필드', ...d.initialStick.map(s => s.band)]);
     rows.push(['데이터(Value)', ...d.initialStick.map(s => s.value)]);
+    rows.push([]);
+    rows.push(['필드', ...d.qcReference.map(s => `QC ${s.band}`)]);
+    rows.push(['기준값(Value)', ...d.qcReference.map(s => s.value)]);
     rows.push([]);
     rows.push(['필드', 'Wake Fail Min', 'Wake Fail Max']);
     rows.push(['데이터(Value)', d.wakeFailMin, d.wakeFailMax]);
