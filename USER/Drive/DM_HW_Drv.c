@@ -335,8 +335,8 @@ void DM_HW_Drv_SystemHalt_WakeupOnStick(void)
     enableInterrupts();
 
     /* Enter Halt Mode */
-    //halt();
-    wfi();
+    halt();
+    //wfi();
 }
 
 /**
